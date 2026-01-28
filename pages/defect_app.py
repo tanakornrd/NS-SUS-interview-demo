@@ -86,6 +86,7 @@ with col_display:
                     [RISK_LEVEL]: (Low / Medium / High / Critical)
                     [PREDICTION]: (Name of potential defect, e.g., Scale, Edge Crack)
                     [ADVICE]: (Immediate action required for the operator)
+                    ตอบเป็นภาษาไทย
                     """
                     
                     # ส่งรูปและ prompt เข้าโมเดล
