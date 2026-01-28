@@ -1,0 +1,46 @@
+text,department
+พบสนิมแดงขึ้นกระจายทั่วแผ่น,Chemical Lab (QC)
+มีคราบน้ำมันสีดำติดที่ผิวเหล็กเยอะมาก,Chemical Lab (QC)
+สีของผิวเหล็กดูหมองคล้ำกว่าปกติ,Chemical Lab (QC)
+เจอรอยด่างขาวเป็นปื้นๆ ที่ขอบม้วน,Chemical Lab (QC)
+ผิวเหล็กมีรอยกัดกร่อนเหมือนโดนสารเคมี,Chemical Lab (QC)
+ค่าเคลือบสังกะสีต่ำกว่ามาตรฐานที่กำหนด,Chemical Lab (QC)
+พบจุดสนิมขาว (White Rust) ขึ้นเป็นหย่อมๆ,Chemical Lab (QC)
+มีสิ่งสกปรกปนเปื้อนฝังอยู่ในเนื้อผิว,Chemical Lab (QC)
+ผิวเหล็กด้าน ไม่เงาตามสเปกที่ตกลงไว้,Chemical Lab (QC)
+เช็ดทำความสะอาดแล้วคราบยังไม่ออก,Chemical Lab (QC)
+ทดสอบ Salt Spray แล้วขึ้นสนิมเร็วกว่ากำหนด,Chemical Lab (QC)
+ความหนาแน่นของสารเคลือบไม่สม่ำเสมอ,Chemical Lab (QC)
+มีรอยคราบน้ำแห้งติดที่ผิวชิ้นงาน,Chemical Lab (QC)
+สีเพี้ยน ไม่ตรงกับ Master Sample,Chemical Lab (QC)
+ผิวเหล็กดูหยาบผิดปกติเมื่อสัมผัส,Chemical Lab (QC)
+นำไปปั๊มขึ้นรูปแล้วชิ้นงานแตกทันที,Mechanical Lab (R&D)
+ค่าความแข็ง (Hardness) สูงเกินไป ดัดไม่ไป,Mechanical Lab (R&D)
+เหล็กนิ่มเกินไป รับน้ำหนักแล้วยุบตัว,Mechanical Lab (R&D)
+ค่า Yield Strength ต่ำกว่ามาตรฐาน,Mechanical Lab (R&D)
+เกิดอาการ Springback (คืนตัว) สูงมากหลังดัด,Mechanical Lab (R&D)
+การยืดตัว (Elongation) ต่ำมาก ดึงแล้วขาดเลย,Mechanical Lab (R&D)
+ผิวส้ม (Orange Peel) ขึ้นตอนปั๊มขึ้นรูป,Mechanical Lab (R&D)
+ทดสอบแรงดึง (Tensile) แล้วไม่ผ่านเกณฑ์,Mechanical Lab (R&D)
+เหล็กเปราะมาก หักง่ายเมื่อพับ 90 องศา,Mechanical Lab (R&D)
+เกรดเหล็กไม่ตรงตามสเปกที่ระบุในใบเซอร์,Mechanical Lab (R&D)
+โครงสร้างจุลภาค (Microstructure) ผิดปกติ,Mechanical Lab (R&D)
+รอยเชื่อมแตกแยกออกจากกันง่าย,Mechanical Lab (R&D)
+ความหนาของแผ่นเหล็กไม่ได้ตาม Tolerance,Mechanical Lab (R&D)
+ดัดโค้งแล้วผิวเคลือบหลุดร่อน (Peeling),Mechanical Lab (R&D)
+ปั๊มแล้วเกิดรอยย่น (Wrinkling) ที่มุมชิ้นงาน,Mechanical Lab (R&D)
+ขอบม้วนเหล็กบุบเสียหายจากการกระแทก,Logistics Investigation
+พาเลทไม้หัก ทำให้สินค้าเอียงล้ม,Logistics Investigation
+พลาสติกห่อหุ้มฉีกขาด น้ำซึมเข้าข้างใน,Logistics Investigation
+สินค้าเปียกชื้นจากการขนส่งช่วงฝนตก,Logistics Investigation
+ป้าย Label ระบุข้อมูลไม่ตรงกับสินค้าจริง,Logistics Investigation
+จำนวนสินค้าที่ได้รับไม่ครบตามใบส่งของ,Logistics Investigation
+เหล็กม้วนล้มตะแคง ทำให้รูปทรงเสีย,Logistics Investigation
+สายรัดเหล็กขาด ทำให้ม้วนเหล็กขยับไปมา,Logistics Investigation
+มีรอยขูดขีดลึกจากการใช้รถยก (Forklift),Logistics Investigation
+บรรจุภัณฑ์ภายนอกสกปรกมาก มีโคลนติด,Logistics Investigation
+ส่งสินค้าผิดโรงงาน ผิดสถานที่,Logistics Investigation
+กระดาษกันชื้นขาดรุ่ย ไม่ป้องกันสินค้า,Logistics Investigation
+วางซ้อนทับกันสูงเกินไปจนชั้นล่างเสียหาย,Logistics Investigation
+แกนกลางม้วนเหล็ก (Inner Diameter) บี้แบน,Logistics Investigation
+หูยกพาเลทฉีกขาด ยกไม่ได้,Logistics Investigation
