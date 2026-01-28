@@ -98,4 +98,33 @@ with col_display:
                     elif "Medium" in result_text:
                         st.warning("⚠️ Caution: Abnormal Condition Warning")
                     else:
-                        st.success("✅ System Normal: Optimal
+                        st.success("✅ System Normal: Optimal Conditions")
+                        
+                    # แสดงผลการวิเคราะห์
+                    st.markdown("### 🧠 AI Assessment")
+                    st.write(result_text)
+                    
+                    # บันทึก Log
+                    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # ดึง Risk Level แบบง่ายๆ
+                    risk_level = "Low"
+                    if "Critical" in result_text: risk_level = "Critical"
+                    elif "High" in result_text: risk_level = "High"
+                    elif "Medium" in result_text: risk_level = "Medium"
+                    
+                    save_log(current_time, machine_temp, pressure, line_speed, result_text, risk_level)
+                    st.toast("บันทึกข้อมูลเรียบร้อยแล้ว", icon="💾")
+                    
+                except Exception as e:
+                    st.error(f"Error: {e}")
+    else:
+        st.info("Waiting for CCTV Input... (Please upload an image)")
+
+# --- ส่วนแสดง History ด้านล่าง ---
+st.divider()
+st.subheader("📜 Detection Log History")
+if os.path.isfile('defect_history.csv'):
+    df = pd.read_csv('defect_history.csv')
+    # แสดงตารางแบบเรียงจากใหม่สุดไปเก่าสุด
+    st.dataframe(df.sort_values(by="Timestamp", ascending=False), use_container_width=True)
