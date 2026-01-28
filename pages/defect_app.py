@@ -7,10 +7,12 @@ import datetime
 import pandas as pd
 
 # --- 1. Config & Setup ---
-# ⚠️ สำคัญ: ใน Code จริงควรซ่อน API Key ไม่ให้ใครเห็นครับ (ใช้ st.secrets)
-GOOGLE_API_KEY = "AIzaSyBCPSibe8SD3TnEJe0IXw3RDvWi9nTshOo" 
-genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-2.5-flash')
+# ดึงรหัสจากตู้เซฟ Secrets แทน (คนนอกมองไม่เห็น)
+if "GOOGLE_API_KEY" in st.secrets:
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=api_key)
+else:
+    st.error("ไม่พบ API Key กรุณาตั้งค่าใน Streamlit Secrets")
 
 # --- ฟังก์ชันบันทึก ---
 def save_log(timestamp, machine_temp, pressure, speed, prediction, risk_level):
