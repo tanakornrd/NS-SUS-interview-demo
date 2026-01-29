@@ -1,5 +1,4 @@
 streamlit
 pandas
-scikit-learn
-opencv-python-headless
+Pillow
 google-generativeai>=0.8.3
