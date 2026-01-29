@@ -12,8 +12,23 @@ st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wi
 
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # ✅ แก้เป็นรุ่น 1.5-flash-latest (เสถียรและรู้จักในไลบรารีใหม่)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    
+    # ✅ ระบบเลือกโมเดลอัตโนมัติ (Auto-Fallback System)
+    # มันจะพยายามใช้ตัวเก่ง (1.5-flash) ก่อน ถ้าหาไม่เจอ จะใช้ตัวเสถียร (pro) แทน
+    try:
+        # ลองเรียก 1.5-flash-002 (ตัวใหม่ล่าสุด)
+        model = genai.GenerativeModel('gemini-1.5-flash-002')
+        # ลอง test call เบาๆ เพื่อเช็คว่าโมเดลอยู่ไหม
+        model.generate_content("test") 
+    except:
+        try:
+            # ถ้าไม่เจอ ลองเรียก 1.5-flash ธรรมดา
+            model = genai.GenerativeModel('gemini-1.5-flash')
+        except:
+            # ถ้ายังไม่เจออีก ใช้ตัวอมตะ gemini-pro (รุ่น 1.0)
+            model = genai.GenerativeModel('gemini-pro')
+            st.toast("⚠️ System Note: Switched to Standard Model (Gemini Pro) for stability.", icon="ℹ️")
+
 else:
     st.error("❌ ไม่พบ API Key กรุณาตั้งค่าใน Streamlit Secrets ก่อนครับ")
     st.stop()
