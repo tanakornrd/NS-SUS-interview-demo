@@ -9,7 +9,7 @@ from sklearn.pipeline import make_pipeline
 import io
 
 # ==========================================
-# 1. ระบบจัดการฐานข้อมูล
+# 1. ระบบจัดการฐานข้อมูล (พร้อมระบบ Auto-Fix)
 # ==========================================
 DB_FILE = 'tracking_db.csv'
 
@@ -20,15 +20,25 @@ def init_db():
         df = pd.DataFrame(columns=expected_columns)
         df.to_csv(DB_FILE, index=False)
     else:
-        # Auto-Migration
+        # 🛠️ AUTO-MIGRATION & FIXER SYSTEM 🛠️
         df = pd.read_csv(DB_FILE)
+        
+        # 1. เติมคอลัมน์ที่ขาด
         missing_cols = [col for col in expected_columns if col not in df.columns]
         if missing_cols:
             for col in missing_cols:
                 if col == 'Current_Handler': df[col] = "System"
                 elif col == 'Status': df[col] = "Pending"
                 else: df[col] = ""
-            df.to_csv(DB_FILE, index=False)
+        
+        # 2. 🚑 DATA FIXER: ซ่อมงานที่ Handler เป็น 'System' ให้ตรงกับ Department
+        # ถ้าคนถือเรื่องเป็น "System" หรือว่างเปล่า -> ให้โอนงานไปที่ Department หลักทันที
+        if 'Current_Handler' in df.columns and 'Department' in df.columns:
+            mask = (df['Current_Handler'] == "System") | (df['Current_Handler'].isna()) | (df['Current_Handler'] == "")
+            if mask.any():
+                df.loc[mask, 'Current_Handler'] = df.loc[mask, 'Department']
+        
+        df.to_csv(DB_FILE, index=False)
 
 def save_to_db(lot_id, complaint, dept, status, days):
     df = pd.read_csv(DB_FILE)
@@ -39,7 +49,7 @@ def save_to_db(lot_id, complaint, dept, status, days):
         'Department': [dept],
         'Status': [status],
         'Estimated_Days': [days],
-        'Current_Handler': [dept],
+        'Current_Handler': [dept], # บังคับให้คนรับผิดชอบคนแรก คือแผนกนั้นๆ เสมอ
         'Action_History': [f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Case Created -> Assigned to {dept}"],
         'Final_Decision': [""],
         'Resolution_Note': [""]
@@ -71,6 +81,7 @@ def get_all_data():
     if not os.path.exists(DB_FILE): return pd.DataFrame()
     return pd.read_csv(DB_FILE)
 
+# เรียกใช้ฟังก์ชันซ่อมฐานข้อมูลทันทีที่รัน
 init_db()
 
 # ==========================================
@@ -95,37 +106,30 @@ def load_model():
 global_model = load_model()
 
 # ==========================================
-# 3. Helper Functions
-# ==========================================
-def generate_final_report(case_data):
-    return f"""
-    ========================================
-    OFFICIAL RESOLUTION LETTER - NSSUS
-    ========================================
-    Date: {datetime.now().strftime("%Y-%m-%d")}
-    Lot ID: {case_data['Lot_ID']}
-    FINAL DECISION: {case_data['Final_Decision']}
-    
-    DETAILS:
-    {case_data['Resolution_Note']}
-    ========================================
-    """
-
-# ==========================================
-# 4. User Interface
+# 3. User Interface
 # ==========================================
 st.set_page_config(page_title="Smart Claim Tracking", page_icon="📦", layout="wide")
 
+# --- SIDEBAR (เครื่องมือ Admin) ---
+with st.sidebar:
+    st.title("🔧 Admin Tools")
+    st.info("ใช้ปุ่มนี้หากต้องการล้างข้อมูลเก่าทิ้งเพื่อเริ่ม Demo ใหม่")
+    if st.button("🗑️ Reset Database (Clear All)", type="primary"):
+        if os.path.exists(DB_FILE):
+            os.remove(DB_FILE)
+            init_db() # สร้างไฟล์ใหม่ทันที
+            st.success("Database cleared! Please refresh the page.")
+            time.sleep(1)
+            st.rerun()
+
 st.title("📦 NSSUS Smart Claim & Tracking Center")
 
-# ปรับ Tabs ใหม่: รวม Submit กับ History ไว้ด้วยกัน
 tab1, tab2, tab3 = st.tabs(["📝 Submit & History Log", "✅ Workflow Approval", "🔍 Customer Tracking"])
 
 df = get_all_data()
 
-# --- TAB 1: Submit & History (รวมร่าง) ---
+# --- TAB 1: Submit & History ---
 with tab1:
-    # ส่วนฟอร์มกรอกข้อมูล (อยู่ด้านบน)
     with st.container():
         c1, c2 = st.columns([2, 1])
         with c1:
@@ -139,7 +143,7 @@ with tab1:
             if st.button("🚀 Process & Save", type="primary", use_container_width=True):
                 if lot_input and complaint_input and global_model:
                     with st.spinner("AI Categorizing..."):
-                        time.sleep(0.8)
+                        time.sleep(0.5)
                         predicted_dept = global_model.predict([complaint_input])[0]
                         status = f"Assigned to {predicted_dept}"
                         days = 3
@@ -147,13 +151,12 @@ with tab1:
                         elif predicted_dept == "Logistics": days = 2
                         save_to_db(lot_input, complaint_input, predicted_dept, status, days)
                     st.success(f"New case created! Assigned to **{predicted_dept}**")
-                    time.sleep(1)
+                    time.sleep(0.5)
                     st.rerun()
                 else:
                     st.warning("Please fill in all fields.")
         
         with c2:
-            # Stats เล็กๆ ด้านขวาให้ดูเก๋ๆ
             if not df.empty:
                 total = len(df)
                 pending = len(df[df['Status'] != 'Case Closed'])
@@ -163,38 +166,31 @@ with tab1:
                 st.info("No Data")
 
     st.divider()
-
-    # ส่วนตารางประวัติ (Professional Table)
     st.subheader("📜 Case History Log")
-    
     if not df.empty:
-        # เรียงลำดับเอาอันล่าสุดขึ้นก่อน (Reverse order)
         df_display = df.iloc[::-1].copy()
-        
-        # เลือกเฉพาะคอลัมน์ที่จำเป็น
         df_display = df_display[['Lot_ID', 'Date', 'Complaint', 'Department', 'Status', 'Current_Handler']]
-        
-        # แสดงผลแบบ Dataframe สวยๆ
         st.dataframe(
             df_display,
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Lot_ID": st.column_config.TextColumn("Lot Number", help="Unique Identifier", width="medium"),
+                "Lot_ID": st.column_config.TextColumn("Lot Number", width="medium"),
                 "Date": st.column_config.TextColumn("Timestamp", width="small"),
                 "Complaint": st.column_config.TextColumn("Issue Description", width="large"),
-                "Department": st.column_config.TextColumn("Category", width="small"),
-                "Status": st.column_config.TextColumn("Current Status", width="medium"),
-                "Current_Handler": st.column_config.TextColumn("Handler", width="small"),
+                "Department": st.column_config.TextColumn("Dept", width="small"),
+                "Status": st.column_config.TextColumn("Status", width="medium"),
+                "Current_Handler": st.column_config.TextColumn("Handler (Who has the ball?)", width="medium"),
             }
         )
     else:
-        st.info("No history data available. Start by submitting a new case above.")
+        st.info("No history data available.")
 
-# --- TAB 2: Workflow (เหมือนเดิม) ---
+# --- TAB 2: Workflow ---
 with tab2:
     st.header("✅ Workflow & Action Center")
-    user_dept = st.selectbox("Select User Role:", ["QC", "R&D", "Logistics", "Customer Service", "System Admin"])
+    # ตัวเลือก User Role
+    user_dept = st.selectbox("Select User Role (Login As):", ["QC", "R&D", "Logistics", "Customer Service", "System Admin"])
     
     subtab_active, subtab_history = st.tabs(["⚡ Pending Tasks", "📜 Completed History"])
 
@@ -205,7 +201,9 @@ with tab2:
         my_active_tasks = pd.DataFrame()
         if user_dept == "System Admin":
             my_active_tasks = active_tasks_all
+            st.caption("ℹ️ Admin Mode: Viewing all active tasks.")
         else:
+            # กรองงานตามแผนกของผู้ใช้
             if 'Current_Handler' in df.columns:
                 my_active_tasks = active_tasks_all[active_tasks_all['Current_Handler'] == user_dept]
 
@@ -218,25 +216,31 @@ with tab2:
                             st.markdown(f"#### 📌 {row['Lot_ID']}")
                             st.markdown(f"**Issue:** {row['Complaint']}")
                             st.caption(f"Status: {row['Status']} | Handler: {row['Current_Handler']}")
+                            with st.expander("History Log"):
+                                if pd.notna(row['Action_History']):
+                                    for h in str(row['Action_History']).split(' || '):
+                                        st.write(f"- {h}")
+
                         with c2:
                             if row['Current_Handler'] == "Customer Service":
                                 decision = st.selectbox("Decision", ["Approve", "Compromise", "Reject"], key=f"d_{row['Lot_ID']}")
                                 note = st.text_input("Note to Customer", key=f"n_{row['Lot_ID']}")
-                                if st.button("Close Case", key=f"btn_{row['Lot_ID']}", type="primary"):
+                                if st.button("🏁 Close Case", key=f"btn_{row['Lot_ID']}", type="primary"):
                                     update_status(row['Lot_ID'], "Case Closed", f"CS: {decision}", "Completed", decision, note)
                                     st.rerun()
                             else:
                                 note = st.text_input("Investigation Note", key=f"in_{row['Lot_ID']}")
-                                if st.button("Forward to CS", key=f"fwd_{row['Lot_ID']}"):
+                                if st.button("➡️ Forward to CS", key=f"fwd_{row['Lot_ID']}"):
                                     update_status(row['Lot_ID'], "Investigation Complete", f"{user_dept}: {note}", "Customer Service")
                                     st.rerun()
             else:
-                st.success(f"No pending tasks for {user_dept}")
+                st.success(f"🎉 No pending tasks for **{user_dept}**")
+                st.caption(f"Check if the task is assigned to another department or System Admin.")
 
         with subtab_history:
             st.dataframe(completed_tasks, use_container_width=True)
 
-# --- TAB 3: Tracking (เหมือนเดิม) ---
+# --- TAB 3: Tracking ---
 with tab3:
     st.subheader("🔍 Customer Status Check")
     track_id = st.text_input("Enter Lot No.", placeholder="LOT-XXXX-XXX")
@@ -248,9 +252,17 @@ with tab3:
                 r = res.iloc[-1]
                 st.success("✅ Found Case")
                 st.progress(100 if r['Status'] == 'Case Closed' else 50)
-                st.write(f"**Status:** {r['Status']}")
-                st.write(f"**Details:** {r['Complaint']}")
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.write(f"**Lot ID:** {r['Lot_ID']}")
+                    st.write(f"**Status:** {r['Status']}")
+                with c2:
+                    st.write(f"**Dept:** {r['Department']}")
+                    st.write(f"**Handler:** {r['Current_Handler']}")
+                
                 if r['Status'] == 'Case Closed':
-                    st.info(f"**Final Decision:** {r['Final_Decision']}\n\n{r['Resolution_Note']}")
+                    st.divider()
+                    st.info(f"**Final Decision:** {r['Final_Decision']}\n\n**Note:** {r['Resolution_Note']}")
             else:
                 st.error("Not Found")
