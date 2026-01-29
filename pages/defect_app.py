@@ -40,7 +40,7 @@ c1, c2, c3, c4 = st.columns(4)
 
 # ใช้ CSS Hack เล็กน้อยเพื่อให้บรรทัดเท่ากัน (ใส่ <br> และตัวอักษรสีจางๆ)
 with c1:
-    st.markdown("**📦 Product Identification**<br><span style='color:gray; font-size:0.8em'>Lot No. for tracking</span>", unsafe_allow_html=True)
+    st.markdown("**📦 Product Lot Number**<br><span style='color:gray; font-size:0.8em'>Lot No. for tracking</span>", unsafe_allow_html=True)
     lot_number = st.text_input("Lot Number", value="LOT-2026-A001", label_visibility="collapsed")
 
 with c2:
