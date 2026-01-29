@@ -1,5 +1,5 @@
 import streamlit as st
-import google-generativeai>=0.8.3 as genai
+import google-generativeai as genai
 from PIL import Image
 import csv
 import os
