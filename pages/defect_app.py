@@ -68,26 +68,56 @@ with col_display:
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
         st.image(image, caption=f"Monitoring Lot: {lot_number}", width=500)
-        
-        if st.button("🚀 Run Predictive Analysis", type="primary"):
-            if not lot_number:
-                st.warning("⚠️ กรุณาระบุเลข Lot Number ก่อนวิเคราะห์ครับ")
-            else:
-                with st.spinner(f"Analyzing Lot {lot_number}..."):
-                    try:
+# --- 🎯 PROMPT ฉบับแม่นยำ (Calibrated Prompt) ---
                         prompt = f"""
-                        Context: You are a QA Engineer at a Steel Factory.
+                        Role: You are a Senior QA Engineer at NS-SUS Factory. 
+                        Your job is to prevent FALSE ALARMS. You only flag defects that are clearly visible and affect product quality.
+                        
                         Target Product Lot No: {lot_number}
                         
                         Current Machine Conditions:
-                        - Temperature: {machine_temp} °C
-                        - Rolling Pressure: {pressure} Bar
-                        - Line Speed: {line_speed} m/min
+                        - Temperature: {machine_temp} °C (Normal Range: 800-900)
+                        - Pressure: {pressure} Bar
+                        - Speed: {line_speed} m/min
                         
-                        Task: 
-                        1. Analyze the attached image for visual anomalies.
-                        2. Predict defect probability based on visual + machine params.
+                        Standard Acceptance Criteria:
+                        1. ACCEPTABLE (Pass): Minor surface texture, water stains, or very faint scratches (light reflection) are NORMAL. Do not flag these.
+                        2. REJECT (Fail): Deep cracks, heavy scale, severe scratches, holes, or distinct discoloration.
                         
+                        Task:
+                        1. Analyzes the image strictly based on the criteria above.
+                        2. If the image looks mostly clean or ambiguous -> Result is "PASS".
+                        3. If there is a CLEAR defect -> Result is "FAIL".
+                        4. Combine visual finding with machine parameters to predict future risk.
+                        
+                        Response Format (Strictly follow this):
+                        [STATUS]: (PASS / FAIL)
+                        [CONFIDENCE_SCORE]: (0-100%)
+                        [DEFECT_TYPE]: (Name of defect OR "None")
+                        [ANALYSIS]: (Brief explanation why you chose Pass/Fail)
+                        [RISK_PREDICTION]: (Based on machine params)
+                        ตอบเป็นภาษาไทย
+                        """
+                        
+                        # ส่งข้อมูลให้ AI
+                        response = model.generate_content([prompt, image])
+                        result_text = response.text
+                        
+                        # --- Logic การแสดงผลแบบใหม่ (ฉลาดขึ้น) ---
+                        # ถ้า AI บอกว่า FAIL และมั่นใจเกิน 70% ถึงจะเตือน
+                        if "[STATUS]: FAIL" in result_text:
+                            st.error(f"🚨 DETECTED: พบความผิดปกติใน Lot {lot_number}")
+                            risk_level = "High"
+                        elif "Critical" in result_text:
+                            st.error("🚨 CRITICAL WARNING!")
+                            risk_level = "Critical"
+                        else:
+                            # เคสปกติ ให้ขึ้นสีเขียวสบายตา
+                            st.success(f"✅ Lot {lot_number} : ผ่านเกณฑ์ (PASS)")
+                            risk_level = "Low"
+                            
+                        st.markdown("### 🧠 AI Analysis Details")
+                        st.code(result_text, language='yaml') # แสดงผลแบบ Code Block จะดู Professional ขึ้น
                         Response Format:
                         [RISK_LEVEL]: (Low / Medium / High / Critical)
                         [PREDICTION]: (Defect Name)
