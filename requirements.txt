@@ -2,4 +2,4 @@ streamlit
 pandas
 scikit-learn
 opencv-python-headless
-google-generativeai
+google-generativeai>=0.8.3
