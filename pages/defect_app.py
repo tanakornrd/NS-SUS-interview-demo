@@ -13,7 +13,7 @@ st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wi
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     # ยังคงใช้ 2.5-flash ตามความต้องการ (แต่เดี๋ยวเราใส่ระบบรอให้)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
     st.error("❌ ไม่พบ API Key กรุณาตั้งค่าใน Streamlit Secrets ก่อนครับ")
     st.stop()
