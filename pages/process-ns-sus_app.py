@@ -14,10 +14,26 @@ import io
 DB_FILE = 'tracking_db.csv'
 
 def init_db():
-    # เพิ่ม Column 'Current_Handler' และ 'Action_History' เพื่อรองรับ Workflow
+    # กำหนดคอลัมน์ที่ต้องมีทั้งหมด
+    expected_columns = ['Lot_ID', 'Date', 'Complaint', 'Department', 'Status', 'Estimated_Days', 'Current_Handler', 'Action_History']
+    
     if not os.path.exists(DB_FILE):
-        df = pd.DataFrame(columns=['Lot_ID', 'Date', 'Complaint', 'Department', 'Status', 'Estimated_Days', 'Current_Handler', 'Action_History'])
+        # ถ้าไม่มีไฟล์ สร้างใหม่เลย
+        df = pd.DataFrame(columns=expected_columns)
         df.to_csv(DB_FILE, index=False)
+    else:
+        # 🛠️ AUTO-MIGRATION SYSTEM 🛠️
+        # ถ้ามีไฟล์อยู่แล้ว เช็คว่าคอลัมน์ครบไหม ถ้าไม่ครบให้เติม
+        df = pd.read_csv(DB_FILE)
+        missing_cols = [col for col in expected_columns if col not in df.columns]
+        
+        if missing_cols:
+            # เติมคอลัมน์ที่ขาดด้วยค่า Default
+            for col in missing_cols:
+                df[col] = "System" if col == 'Current_Handler' else ""
+            
+            # บันทึกทับไฟล์เดิมทันที
+            df.to_csv(DB_FILE, index=False)
 
 def save_to_db(lot_id, complaint, dept, status, days):
     df = pd.read_csv(DB_FILE)
