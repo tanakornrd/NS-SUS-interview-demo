@@ -105,9 +105,9 @@ with col_right:
                     - (Point 1: Describe visual findings clearly)
                     - (Point 2: Explain if it meets acceptance criteria)
                     - (Point 3: Relate to machine parameters if relevant)
-                    
+                    เว้น 1 บรรทัด
                     [RISK_PREDICTION]: (One sentence prediction)
-                    
+                    เว้น 1 บรรทัด
                     [HOW TO PREVENT] : 
                     - บอกวิธีแก้ไข next step ต้องปรับค่าอะไร หรือต้องจัดการกับปัญหายังไง
                     โดยคำนึงถึงผลทางเศรษฐศาสตร์และความต่อเนื่องของกระบวนการผลิตเป็นหลัก กระชับใน 2 ประโยค
