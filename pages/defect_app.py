@@ -4,25 +4,21 @@ import sys
 import subprocess
 import time
 
-# --- 0. FORCE UPDATE SYSTEM (ระบบบังคับอัปเกรดสมอง AI) ---
-# ส่วนนี้จะทำงานก่อน Code อื่นเพื่อแก้ปัญหา Server ดื้อไม่ยอมอัปเดต
+# --- 0. NUCLEAR INSTALLATION (สูตรล้างเครื่อง) ---
+# ส่วนนี้จะทำงานก่อนทุกอย่าง เพื่อบังคับลงไลบรารีใหม่ล่าสุดให้ได้
 try:
     import google.generativeai as genai
-    # เช็กเวอร์ชันปัจจุบัน
     current_ver = genai.__version__
-    st.toast(f"System Check: AI Library Version {current_ver}", icon="ℹ️")
     
-    # ถ้าเวอร์ชันต่ำกว่า 0.8.3 หรือเป็นตัว Beta เก่าๆ ให้สั่งลงใหม่เดี๋ยวนี้
+    # ถ้าเวอร์ชันเก่ากว่า 0.8.3 สั่งลบและลงใหม่ทันที
     if current_ver < "0.8.3":
-        st.warning(f"⚠️ Found old library ({current_ver}). Forcing upgrade...")
+        st.toast(f"Found old library v{current_ver}. Upgrading...", icon="🔄")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "google-generativeai>=0.8.3"])
-        st.rerun() # รีสตาร์ทแอปทันทีหลังจากลงเสร็จ
-except ImportError:
+        st.rerun() # รีสตาร์ทแอปทันที
+except:
+    # ถ้ายังไม่มี ก็สั่งลงเลย
     subprocess.check_call([sys.executable, "-m", "pip", "install", "google-generativeai>=0.8.3"])
     st.rerun()
-except Exception as e:
-    # ถ้าลงไม่ได้จริงๆ ให้ปล่อยผ่านไปก่อน
-    pass
 
 # --- เริ่มต้น Import ปกติ ---
 import google.generativeai as genai
@@ -36,24 +32,47 @@ st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wi
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # 🧠 SMART MODEL SELECTOR (ระบบเลือกโมเดลอัจฉริยะ)
-    # พยายามใช้ 1.5 Flash ก่อน ถ้าไม่ได้จะถอยไปใช้ตัวอื่นที่ Server รู้จัก
+    # 🧠 SYSTEM: MODEL DISCOVERY (ถาม Server ว่ามีโมเดลอะไรบ้าง)
+    # เราจะไม่เดาชื่อแล้ว เราจะให้ Server บอกมาเลย
+    valid_model = None
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        # Test Call
-        model.generate_content("test")
-        st.toast("✅ Connected to: Gemini 1.5 Flash", icon="🚀")
-    except:
-        try:
-            # ถ้า 1.5 Flash พัง ให้ลองรุ่น Latest
-            model = genai.GenerativeModel('gemini-1.5-flash-latest')
-            model.generate_content("test")
-            st.toast("✅ Connected to: Gemini 1.5 Flash (Latest)", icon="🚀")
-        except:
-            # ถ้ายังไม่ได้ ให้ใช้ 'gemini-pro-vision' (รุ่นเก่าที่รองรับรูปภาพแน่นอน)
-            # เพื่อให้ Demo ไม่ล่มกลางคัน
-            model = genai.GenerativeModel('gemini-pro-vision')
-            st.toast("⚠️ Fallback Mode: Gemini Pro Vision", icon="🛡️")
+        # ดึงรายชื่อโมเดลทั้งหมดที่ API Key นี้ใช้ได้
+        model_list = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                model_list.append(m.name)
+        
+        # แสดงเวอร์ชันและรายชื่อโมเดลใน Sidebar (เพื่อ Debug)
+        st.sidebar.header("🔧 System Status")
+        st.sidebar.text(f"Lib Version: {genai.__version__}")
+        
+        # Logic เลือกโมเดลอัตโนมัติ (Flash > Pro > Vision)
+        target_keywords = ['flash', 'gemini-1.5', 'vision']
+        
+        for keyword in target_keywords:
+            for m_name in model_list:
+                if keyword in m_name:
+                    valid_model = genai.GenerativeModel(m_name)
+                    st.sidebar.success(f"Active Model: {m_name}")
+                    break
+            if valid_model: break
+        
+        # ถ้าหาไม่เจอจริงๆ ให้ User เลือกเองจาก Dropdown ที่ Sidebar
+        if not valid_model:
+            st.sidebar.error("Auto-detect failed. Please select:")
+            selected = st.sidebar.selectbox("Manual Select:", model_list)
+            if selected:
+                valid_model = genai.GenerativeModel(selected)
+
+    except Exception as e:
+        st.error(f"Connection Error: {e}")
+        st.stop()
+        
+    if valid_model:
+        model = valid_model
+    else:
+        st.error("❌ CRITICAL: ไม่พบโมเดลที่รองรับ (กรุณาเช็ก API Key หรือ Library)")
+        st.stop()
 
 else:
     st.error("❌ ไม่พบ API Key กรุณาตรวจสอบใน Secrets")
@@ -74,16 +93,25 @@ LINE_CONFIG = {
         "Param2": {"name": "Air Knife Pressure", "unit": "kPa", "default": 40, "min": 0, "max": 100},
         "Param3": {"name": "Line Speed", "unit": "mpm", "default": 180, "min": 0, "max": 300},
         "Defect_Focus": "Dross, Spangle defects, Uncoated spots, Zinc adhesion issues"
+    },
+    "EPL (Electrolytic Plating Line)": {
+        "Product": "TP/TFS (Tinplate/Tin Free)",
+        "Param1": {"name": "Current Density", "unit": "A/dm²", "default": 20, "min": 0, "max": 100},
+        "Param2": {"name": "Plating Solution Temp", "unit": "°C", "default": 50, "min": 20, "max": 80},
+        "Param3": {"name": "Line Speed", "unit": "mpm", "default": 400, "min": 0, "max": 800},
+        "Defect_Focus": "Pinholes, Plating burns, Rust, Scratch (from Anode)"
     }
 }
 
 # --- 3. Save Function ---
 def save_log(timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defect_type, risk_level):
     file_name = 'production_logs_v2.csv'
-    file_exists = os.path.isfile(file_name)
+    # Check if file exists to determine if header is needed
+    header_needed = not os.path.isfile(file_name)
+    
     with open(file_name, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        if not file_exists:
+        if header_needed:
             writer.writerow(['Timestamp', 'Line', 'Lot No.', 'Param 1', 'Param 2', 'Param 3', 'Status', 'Defect', 'Risk'])
         writer.writerow([timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defect_type, risk_level])
 
@@ -149,7 +177,7 @@ with col_right:
                 [ANALYSIS]: (Explanation)
                 """
                 
-                # เรียก AI (ใช้ Model ที่เลือกมาแล้วข้างบน)
+                # เรียก AI
                 response = model.generate_content([prompt, image])
                 result_text = response.text
                 
@@ -169,3 +197,10 @@ with col_right:
                 
             except Exception as e:
                 st.error(f"Processing Error: {e}")
+
+# History
+st.divider()
+st.subheader("📜 History Log")
+if os.path.isfile('production_logs_v2.csv'):
+    df = pd.read_csv('production_logs_v2.csv')
+    st.dataframe(df.sort_values(by="Timestamp", ascending=False), use_container_width=True)
