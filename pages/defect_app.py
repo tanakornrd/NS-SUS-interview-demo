@@ -83,7 +83,7 @@ with col_right:
                 try:
                     # --- 🔥 PROMPT ENGINEERING (สั่งให้ตอบเป็น Bullet) ---
                     prompt = f"""
-                    Role: You are a Senior QA Engineer at a Steel Factory. 
+                    Role: You are a Senior QA Engineer at a Steel Factory (NS-SUS). 
                     
                     Target Product Lot No: {lot_number}
                     Current Machine Conditions:
@@ -105,8 +105,13 @@ with col_right:
                     - (Point 1: Describe visual findings clearly)
                     - (Point 2: Explain if it meets acceptance criteria)
                     - (Point 3: Relate to machine parameters if relevant)
+                    
                     [RISK_PREDICTION]: (One sentence prediction)
-                    ตอบเป็นภาษาไทย
+                    
+                    [HOW TO PREVENT] : 
+                    - บอกวิธีแก้ไข next step ต้องปรับค่าอะไร หรือต้องจัดการกับปัญหายังไงโดยคำนึงถึงผลทางเศรษฐศาสตร์และความต่อเนื่องของกระบวนการผลิตเป็นหลัก กระชับใน 2 ประโยค
+                    
+                    ตอบทั้งหมดเป็นภาษาไทย
                     """
                     
                     response = model.generate_content([prompt, image])
