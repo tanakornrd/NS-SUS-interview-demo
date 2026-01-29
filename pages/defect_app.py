@@ -1,50 +1,23 @@
 import streamlit as st
-import os
-import sys
-import subprocess
-
-# --- 0. FORCE UPGRADE (บังคับอัปเกรดสมอง AI เดี๋ยวนี้!) ---
-# โค้ดส่วนนี้จะเช็กเวอร์ชัน และบังคับโหลดตัวใหม่ถ้า Server ยังใช้ตัวเก่า
-try:
-    import google.generativeai as genai
-    current_version = genai.__version__
-    # ถ้าเวอร์ชันเก่ากว่า 0.8.3 ให้สั่งลงใหม่ทันที
-    if current_version < "0.8.3":
-        st.toast(f"🔧 Updating AI Library from {current_version}...", icon="🔄")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "google-generativeai>=0.8.3"])
-        import google.generativeai as genai # โหลดใหม่
-except Exception as e:
-    # ถ้ายังไม่มี ก็สั่งลงเลย
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "google-generativeai>=0.8.3"])
-    import google.generativeai as genai
-
+import google.generativeai as genai
 from PIL import Image
 import csv
+import os
 import datetime
 import pandas as pd
-import time
 
 # --- 1. Config & Setup ---
 st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wide")
 
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    
-    # ✅ ใช้ Model ตัวเก่ง (1.5 Flash) ได้เลย เพราะเราบังคับอัปเกรดแล้ว
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        # เช็กการเชื่อมต่อเบาๆ 1 ที
-        model.generate_content("test")
-    except Exception as e:
-        st.error(f"AI Error: {e}")
-        st.stop()
+    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
-    st.error("❌ ไม่พบ API Key (กรุณาใส่รหัสใหม่ใน Secrets)")
+    st.error("❌ ไม่พบ API Key กรุณาตั้งค่าใน Streamlit Secrets ก่อนครับ")
     st.stop()
 
-# ... (ส่วนที่เหลือของโค้ด ตั้งแต่ def save_log เป็นต้นไป ปล่อยไว้เหมือนเดิมครับ) ...
-
 # --- 🧠 KNOWLEDGE BASE (สมองของระบบ) ---
+# นี่คือส่วนที่ทำให้ระบบฉลาดและรองรับหลายไลน์ผลิตตามรูปภาพ Process Map
 LINE_CONFIG = {
     "CDCM (Cold Rolling Mill)": {
         "Product": "CR (Cold Rolled Steel)",
@@ -82,7 +55,7 @@ LINE_CONFIG = {
 
 # --- ฟังก์ชันบันทึก ---
 def save_log(timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defect_type, risk_level):
-    file_name = 'production_logs_v2.csv'
+    file_name = 'production_logs_v2.csv' # เปลี่ยนชื่อไฟล์เพราะโครงสร้างเปลี่ยน
     file_exists = os.path.isfile(file_name)
     with open(file_name, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
@@ -94,28 +67,37 @@ def save_log(timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defec
 st.title("🏭 NSSUS Universal Process QA")
 st.markdown("---")
 
-# 🟢 1. Line Selection
+# 🟢 1. Line Selection (เลือกไลน์ผลิตก่อน)
 st.subheader("📍 Select Production Line")
 selected_line_name = st.selectbox("Choose Process Unit:", list(LINE_CONFIG.keys()))
+
+# ดึง Config ของไลน์ที่เลือกมา
 current_config = LINE_CONFIG[selected_line_name]
 
-# 🟢 2. Dynamic Control Panel
+# 🟢 2. Dynamic Control Panel (เปลี่ยนปุ่มตามไลน์ที่เลือก)
 st.markdown(f"**active Module:** `{current_config['Product']}` | **Process:** *{current_config['Process_Desc']}*")
 
 with st.container(border=True):
     c1, c2, c3, c4 = st.columns(4)
+    
     with c1:
         st.markdown("**📦 Lot Number**")
         lot_number = st.text_input("Lot No.", value="LOT-2026-X001", label_visibility="collapsed")
+    
     with c2:
+        # ดึงชื่อ Parameter 1 มาแสดง
         p1_cfg = current_config['Param1']
         st.markdown(f"**⚙️ {p1_cfg['name']} ({p1_cfg['unit']})**")
         p1_val = st.number_input("P1", value=p1_cfg['default'], min_value=p1_cfg['min'], max_value=p1_cfg['max'], label_visibility="collapsed")
+
     with c3:
+        # ดึงชื่อ Parameter 2 มาแสดง
         p2_cfg = current_config['Param2']
         st.markdown(f"**⚙️ {p2_cfg['name']} ({p2_cfg['unit']})**")
         p2_val = st.number_input("P2", value=p2_cfg['default'], min_value=p2_cfg['min'], max_value=p2_cfg['max'], label_visibility="collapsed")
+
     with c4:
+        # ดึงชื่อ Parameter 3 มาแสดง
         p3_cfg = current_config['Param3']
         st.markdown(f"**⏩ {p3_cfg['name']} ({p3_cfg['unit']})**")
         p3_val = st.number_input("P3", value=p3_cfg['default'], min_value=p3_cfg['min'], max_value=p3_cfg['max'], label_visibility="collapsed")
@@ -143,96 +125,74 @@ with col_right:
             st.warning("⚠️ Please enter Lot Number")
         else:
             with st.spinner(f"Consulting {selected_line_name} Expert Module..."):
-                
-                # --- ✅ 2. เริ่มต้นระบบ RETRY LOGIC (แก้ Error 429) ---
-                response = None
-                retry_count = 0
-                max_retries = 3 # ให้โอกาสลองใหม่ 3 ครั้ง
-                
-                # เตรียม Prompt ไว้ก่อน
-                prompt = f"""
-                Role: You are a Top-Tier Process Engineer at NSSUS specializing in {selected_line_name}.
-                Your expertise covers defects specifically for: {current_config['Product']}.
-                
-                Target Lot: {lot_number}
-                
-                Machine Telemetry:
-                - {current_config['Param1']['name']}: {p1_val} {current_config['Param1']['unit']}
-                - {current_config['Param2']['name']}: {p2_val} {current_config['Param2']['unit']}
-                - {current_config['Param3']['name']}: {p3_val} {current_config['Param3']['unit']}
-                
-                Likely Defects in this process: {current_config['Defect_Focus']}
-                
-                Task:
-                1. VISUAL: Analyze the image for specific defects related to {current_config['Product']}.
-                2. CORRELATION: Correlate the visual finding with the machine telemetry provided.
-                3. DECISION: Pass or Fail based on high standards.
-                
-                Response Format (Markdown):
-                [STATUS]: (PASS / FAIL)
-                [DEFECT_DETECTED]: (Specific Name or "None")
-                [CONFIDENCE_SCORE]: (0-100%)
-                [ROOT_CAUSE_ANALYSIS]:
-                - Observation: (What you see)
-                - Technical Link: (How parameters might have caused this)
-                [RECOMMENDED_ACTION]: (Specific adjustment for the operator กระชับใน 1-2 ประโยค)
-                ตอบเป็นภาษาไทย
-                """
-
-                # เริ่มวนลูปพยายามเรียก AI
-                while retry_count < max_retries:
-                    try:
-                        response = model.generate_content([prompt, image])
-                        break # ถ้าสำเร็จ ให้หยุดลูปทันที
-                    except Exception as e:
-                        if "429" in str(e): # ถ้าเจอโค้ด 429 (Quota เต็ม)
-                            wait_time = 25 # รอ 25 วินาที (ตามที่ Error บอกประมาณ 22 วิ)
-                            st.warning(f"⚠️ High Traffic (Error 429). Retrying in {wait_time} seconds... (Attempt {retry_count+1}/{max_retries})")
-                            time.sleep(wait_time) # หยุดรอ
-                            retry_count += 1
-                        else:
-                            st.error(f"System Error: {e}") # ถ้าเป็น error อื่นให้แจ้งเลย
-                            break
-
-                # --- จบส่วน Retry Logic ---
-
-                if response: # ถ้าได้คำตอบมา (response ไม่ว่างเปล่า)
-                    try:
-                        result_text = response.text
+                try:
+                    # --- 🔥 DYNAMIC PROMPT (หัวใจสำคัญของการเพิ่มความแม่นยำ) ---
+                    # เราจะส่ง "บริบทเฉพาะทาง" ของแต่ละไลน์ไปให้ AI
+                    prompt = f"""
+                    Role: You are a Top-Tier Process Engineer at NSSUS specializing in {selected_line_name}.
+                    Your expertise covers defects specifically for: {current_config['Product']}.
+                    
+                    Target Lot: {lot_number}
+                    
+                    Machine Telemetry:
+                    - {current_config['Param1']['name']}: {p1_val} {current_config['Param1']['unit']}
+                    - {current_config['Param2']['name']}: {p2_val} {current_config['Param2']['unit']}
+                    - {current_config['Param3']['name']}: {p3_val} {current_config['Param3']['unit']}
+                    
+                    Likely Defects in this process: {current_config['Defect_Focus']}
+                    
+                    Task:
+                    1. VISUAL: Analyze the image for specific defects related to {current_config['Product']}. 
+                       (e.g., if Galvanizing, look for Spangle/Dross. If Tinplate, look for Pinholes).
+                    2. CORRELATION: Correlate the visual finding with the machine telemetry provided.
+                       (e.g., Low Zinc Pot Temp -> Dross Risk).
+                    3. DECISION: Pass or Fail based on high standards.
+                    
+                    Response Format (Markdown):
+                    [STATUS]: (PASS / FAIL)
+                    [DEFECT_DETECTED]: (Specific Name or "None")
+                    [CONFIDENCE_SCORE]: (0-100%)
+                    [ROOT_CAUSE_ANALYSIS]:
+                    - Observation: (What you see)
+                    - Technical Link: (How parameters might have caused this)
+                    [RECOMMENDED_ACTION]: (Specific adjustment for the operator)
+                    ตอบเป็นภาษาไทย
+                    """
+                    
+                    response = model.generate_content([prompt, image])
+                    result_text = response.text
+                    
+                    # --- Display Logic ---
+                    if "[STATUS]: FAIL" in result_text:
+                        st.error(f"🚨 FAIL: Defect Detected in {lot_number}")
+                        risk = "High"
+                        status = "FAIL"
+                    elif "Critical" in result_text:
+                        st.error("🚨 CRITICAL STOP")
+                        risk = "Critical"
+                        status = "FAIL"
+                    else:
+                        st.success(f"✅ PASS: Quality Approved")
+                        risk = "Low"
+                        status = "PASS"
+                    
+                    with st.container(border=True):
+                        st.markdown("### 📝 Engineering Report")
+                        st.markdown(result_text)
+                    
+                    # Extract Defect Name simple logic
+                    defect_name = "Normal"
+                    if "DEFECT_DETECTED]:" in result_text:
+                        try:
+                            defect_name = result_text.split("[DEFECT_DETECTED]:")[1].split("\n")[0].strip()
+                        except: pass
                         
-                        # Display Logic
-                        if "[STATUS]: FAIL" in result_text:
-                            st.error(f"🚨 FAIL: Defect Detected in {lot_number}")
-                            risk = "High"
-                            status = "FAIL"
-                        elif "Critical" in result_text:
-                            st.error("🚨 CRITICAL STOP")
-                            risk = "Critical"
-                            status = "FAIL"
-                        else:
-                            st.success(f"✅ PASS: Quality Approved")
-                            risk = "Low"
-                            status = "PASS"
-                        
-                        with st.container(border=True):
-                            st.markdown("### 📝 Engineering Report")
-                            st.markdown(result_text)
-                        
-                        # Extract Defect Name
-                        defect_name = "Normal"
-                        if "DEFECT_DETECTED]:" in result_text:
-                            try:
-                                defect_name = result_text.split("[DEFECT_DETECTED]:")[1].split("\n")[0].strip()
-                            except: pass
-                            
-                        # Save Log
-                        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        save_log(current_time, selected_line_name, lot_number, p1_val, p2_val, p3_val, status, defect_name, risk)
-                        
-                    except Exception as e:
-                        st.error(f"Processing Error: {e}")
-                else:
-                    st.error("❌ ขออภัย ระบบ AI ไม่สามารถตอบสนองได้ในขณะนี้ (Server Busy) กรุณาลองใหม่ในอีก 1 นาที")
+                    # Save to new CSV structure
+                    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    save_log(current_time, selected_line_name, lot_number, p1_val, p2_val, p3_val, status, defect_name, risk)
+                    
+                except Exception as e:
+                    st.error(f"System Error: {e}")
 
 # 🟢 History Log
 st.divider()
