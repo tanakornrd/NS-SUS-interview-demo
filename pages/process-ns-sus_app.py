@@ -9,9 +9,10 @@ from sklearn.pipeline import make_pipeline
 import io
 
 # ==========================================
-# 1. ระบบจัดการฐานข้อมูล (เปลี่ยนชื่อไฟล์เพื่อเริ่มใหม่)
+# 1. ระบบจัดการฐานข้อมูล
 # ==========================================
-DB_FILE = 'tracking_db_v2.csv' # <--- เปลี่ยนชื่อไฟล์ตรงนี้ เพื่อหนีไฟล์เก่าที่อาจจะเพี้ยน
+# เปลี่ยนชื่อไฟล์เล็กน้อยเพื่อให้ระบบสร้างไฟล์ใหม่ที่มีโครงสร้างล่าสุด
+DB_FILE = 'tracking_db_v3_mcs.csv' 
 
 def init_db():
     expected_columns = ['Lot_ID', 'Date', 'Complaint', 'Department', 'Status', 'Estimated_Days', 'Current_Handler', 'Action_History', 'Final_Decision', 'Resolution_Note']
@@ -20,21 +21,19 @@ def init_db():
         df = pd.DataFrame(columns=expected_columns)
         df.to_csv(DB_FILE, index=False)
     else:
-        # Auto-Fixer: รันทุกครั้งเพื่อความชัวร์
+        # Auto-Fixer
         df = pd.read_csv(DB_FILE)
-        
-        # 1. เช็กคอลัมน์ครบไหม
         missing_cols = [col for col in expected_columns if col not in df.columns]
         if missing_cols:
             for col in missing_cols:
                 df[col] = ""
         
-        # 2. 🚑 Fix System Handler: ถ้ามีงานไหนหลุดเป็น System ให้แก้เป็น Department ทันที
+        # 🚑 Fix System Handler
         if 'Current_Handler' in df.columns and 'Department' in df.columns:
             mask = (df['Current_Handler'] == "System") | (df['Current_Handler'].isnull())
             if mask.any():
                 df.loc[mask, 'Current_Handler'] = df.loc[mask, 'Department']
-                
+        
         df.to_csv(DB_FILE, index=False)
 
 def save_to_db(lot_id, complaint, dept, status, days):
@@ -46,7 +45,7 @@ def save_to_db(lot_id, complaint, dept, status, days):
         'Department': [dept],
         'Status': [status],
         'Estimated_Days': [days],
-        'Current_Handler': [dept], # 🚨 จุดสำคัญ: บังคับให้ Handler = แผนกที่ AI เลือกทันที
+        'Current_Handler': [dept], 
         'Action_History': [f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Case Created -> Assigned to {dept}"],
         'Final_Decision': [""],
         'Resolution_Note': [""]
@@ -58,11 +57,13 @@ def update_status(lot_id, new_status, action_note, next_handler=None, final_deci
     df = pd.read_csv(DB_FILE)
     idx = df[df['Lot_ID'].astype(str) == str(lot_id)].index
     if not idx.empty:
-        # ถ้ามีการบังคับเปลี่ยน Handler (Admin Override)
+        # Logic สำหรับการย้ายงาน (Force Move)
         if force_handler:
             df.loc[idx, 'Current_Handler'] = force_handler
-            df.loc[idx, 'Department'] = force_handler # เปลี่ยนแผนกหลักด้วยเผื่อส่งผิด
-            action_note += f" (Admin moved case to {force_handler})"
+            # ถ้าเป็นการย้ายงาน สถานะอาจจะเปลี่ยนกลับไปเป็น Pending Investigation
+            if "Case Closed" not in new_status: 
+                 df.loc[idx, 'Department'] = force_handler # อัปเดต Department หลักตามไปด้วย
+            action_note += f" (Management re-assigned to {force_handler})"
 
         df.loc[idx, 'Status'] = new_status
         history = df.loc[idx, 'Action_History'].values[0]
@@ -112,9 +113,21 @@ global_model = load_model()
 # ==========================================
 st.set_page_config(page_title="Smart Claim Tracking", page_icon="📦", layout="wide")
 
+# --- SIDEBAR: เครื่องมือล้างฐานข้อมูล ---
+with st.sidebar:
+    st.title("🔧 Tools")
+    st.info("กดปุ่มด้านล่างเพื่อล้างข้อมูลทั้งหมดและเริ่ม Demo ใหม่")
+    if st.button("🗑️ Reset Database (Clear All)", type="primary"):
+        if os.path.exists(DB_FILE):
+            os.remove(DB_FILE)
+            init_db()
+            st.success("Database Cleared! 🧹")
+            time.sleep(1)
+            st.rerun()
+
 st.title("📦 NSSUS Smart Claim & Tracking Center")
 
-tab1, tab2, tab3 = st.tabs(["📝 Submit & History Log", "✅ Workflow Approval", "🔍 Customer Tracking"])
+tab1, tab2, tab3 = st.tabs(["📝 Submit & History", "✅ Workflow (MCS)", "🔍 Customer Tracking"])
 
 df = get_all_data()
 
@@ -141,9 +154,8 @@ with tab1:
                         elif predicted_dept == "Logistics": days = 2
                         
                         save_to_db(lot_input, complaint_input, predicted_dept, status, days)
-                    
-                    st.success(f"New case created! Sent directly to **{predicted_dept}**")
-                    time.sleep(1)
+                    st.success(f"New case assigned to **{predicted_dept}**")
+                    time.sleep(0.5)
                     st.rerun()
                 else:
                     st.warning("Please fill in all fields.")
@@ -165,12 +177,15 @@ with tab1:
             hide_index=True
         )
     else:
-        st.info("No data yet. Submit a case to start.")
+        st.info("No data available.")
 
 # --- TAB 2: Workflow ---
 with tab2:
     st.header("✅ Workflow & Action Center")
-    user_dept = st.selectbox("Login As:", ["QC", "R&D", "Logistics", "Customer Service", "System Admin"])
+    
+    # รวม Role Admin เข้ากับ MCS แล้ว
+    user_roles = ["QC", "R&D", "Logistics", "Marketing & Customer Service (MCS)"]
+    user_dept = st.selectbox("Login As:", user_roles)
     
     subtab_active, subtab_history = st.tabs(["⚡ Pending Tasks", "📜 Completed History"])
 
@@ -179,64 +194,73 @@ with tab2:
         active_tasks_all = df[df['Status'] != 'Case Closed']
         
         my_active_tasks = pd.DataFrame()
-        if user_dept == "System Admin":
+        
+        # === LOGIC การมองเห็นงาน ===
+        # ถ้าเป็น MCS (หรือ Admin เก่า) ให้เห็นงานทั้งหมด!
+        if user_dept == "Marketing & Customer Service (MCS)":
             my_active_tasks = active_tasks_all
-            st.warning("👑 Admin Mode: You can see and manage ALL active tasks.")
+            st.success("👑 MCS Mode: You have full visibility and control over all active tasks.")
         else:
+            # ถ้าเป็นแผนกอื่น เห็นแค่งานตัวเอง
             if 'Current_Handler' in df.columns:
-                # กรองงานให้ตรงกับแผนกจริงๆ
                 my_active_tasks = active_tasks_all[active_tasks_all['Current_Handler'] == user_dept]
 
         with subtab_active:
             if not my_active_tasks.empty:
                 for index, row in my_active_tasks.iterrows():
                     with st.container(border=True):
-                        c1, c2 = st.columns([2, 1])
+                        c1, c2 = st.columns([1.5, 1])
+                        
+                        # --- ข้อมูลงาน ---
                         with c1:
                             st.markdown(f"#### 📌 {row['Lot_ID']}")
                             st.markdown(f"**Issue:** {row['Complaint']}")
-                            # แสดงให้เห็นชัดๆ ว่างานอยู่ที่ใคร
                             st.info(f"**Current Handler:** {row['Current_Handler']}") 
                             
-                            with st.expander("History Log"):
+                            with st.expander("Show History Log"):
                                 if pd.notna(row['Action_History']):
                                     for h in str(row['Action_History']).split(' || '):
                                         st.caption(f"• {h}")
 
+                        # --- ปุ่มสั่งการ (Action) ---
                         with c2:
                             st.write("### Action")
                             
-                            # === ADMIN OVERRIDE TOOL ===
-                            if user_dept == "System Admin":
-                                st.markdown("##### 🛠️ Admin Override")
-                                new_handler = st.selectbox("Force Move To:", ["QC", "R&D", "Logistics", "Customer Service"], key=f"move_{row['Lot_ID']}")
-                                if st.button("Move Case", key=f"btn_move_{row['Lot_ID']}"):
-                                    update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "Admin moved case", force_handler=new_handler)
+                            # ถ้าเป็น MCS: จะมีปุ่มพิเศษ (Super Power)
+                            if user_dept == "Marketing & Customer Service (MCS)":
+                                
+                                # 1. ถ้างานอยู่ที่ตัวเอง -> ตัดสินใจปิดเคสได้
+                                if row['Current_Handler'] == "Marketing & Customer Service (MCS)":
+                                    st.markdown("##### ⚖️ Final Decision")
+                                    decision = st.selectbox("Decision", ["Approve", "Compromise", "Reject"], key=f"d_{row['Lot_ID']}")
+                                    note = st.text_input("Note to Customer", key=f"n_{row['Lot_ID']}")
+                                    if st.button("🏁 Close Case", key=f"btn_{row['Lot_ID']}", type="primary"):
+                                        update_status(row['Lot_ID'], "Case Closed", f"MCS: {decision}", "Completed", decision, note)
+                                        st.rerun()
+                                
+                                # 2. ฟีเจอร์ Admin Override: ย้ายงานได้เสมอ ไม่ว่างานจะอยู่ที่ใคร
+                                st.markdown("---")
+                                st.caption("🛠️ **Management Override**")
+                                new_handler = st.selectbox("Re-assign to:", ["QC", "R&D", "Logistics", "Marketing & Customer Service (MCS)"], key=f"move_{row['Lot_ID']}")
+                                if st.button("Force Move", key=f"btn_move_{row['Lot_ID']}"):
+                                    update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS moved case", force_handler=new_handler)
                                     st.success(f"Moved to {new_handler}")
                                     st.rerun()
 
-                            # === NORMAL USER ACTIONS ===
-                            elif row['Current_Handler'] == "Customer Service":
-                                decision = st.selectbox("Decision", ["Approve", "Compromise", "Reject"], key=f"d_{row['Lot_ID']}")
-                                note = st.text_input("Note to Customer", key=f"n_{row['Lot_ID']}")
-                                if st.button("🏁 Close Case", key=f"btn_{row['Lot_ID']}", type="primary"):
-                                    update_status(row['Lot_ID'], "Case Closed", f"CS: {decision}", "Completed", decision, note)
-                                    st.rerun()
-                            
-                            else: # QC, R&D, Logistics
+                            # ถ้าเป็นแผนกอื่น (QC, R&D, Logistics)
+                            else: 
                                 note = st.text_input("Investigation Note", key=f"in_{row['Lot_ID']}")
-                                if st.button("➡️ Forward to CS", key=f"fwd_{row['Lot_ID']}"):
-                                    update_status(row['Lot_ID'], "Investigation Complete", f"{user_dept}: {note}", "Customer Service")
+                                # ส่งต่อให้ MCS
+                                if st.button("➡️ Forward to MCS", key=f"fwd_{row['Lot_ID']}"):
+                                    update_status(row['Lot_ID'], "Investigation Complete", f"{user_dept}: {note}", "Marketing & Customer Service (MCS)")
                                     st.rerun()
             else:
                 st.success(f"🎉 No pending tasks for **{user_dept}**")
-                if user_dept != "System Admin":
-                    st.caption("If you just submitted a case, check if AI assigned it to another department.")
 
         with subtab_history:
             st.dataframe(completed_tasks, use_container_width=True)
 
-# --- TAB 3: Tracking ---
+# --- TAB 3: Customer Tracking ---
 with tab3:
     st.subheader("🔍 Customer Status Check")
     track_id = st.text_input("Enter Lot No.", placeholder="LOT-XXXX-XXX")
@@ -254,6 +278,7 @@ with tab3:
                     st.write(f"**Lot ID:** {r['Lot_ID']}")
                     st.write(f"**Status:** {r['Status']}")
                 with c2:
+                    st.write(f"**Dept:** {r['Department']}")
                     st.write(f"**Handler:** {r['Current_Handler']}")
                 
                 if r['Status'] == 'Case Closed':
