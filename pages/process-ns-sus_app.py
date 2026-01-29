@@ -20,18 +20,21 @@ def init_db():
         df = pd.DataFrame(columns=expected_columns)
         df.to_csv(DB_FILE, index=False)
     else:
-        # 🛠️ AUTO-MIGRATION SYSTEM
+        # 🛠️ AUTO-MIGRATION SYSTEM (ฉลาดขึ้น)
         df = pd.read_csv(DB_FILE)
         missing_cols = [col for col in expected_columns if col not in df.columns]
         
-        if missing_cols:
-            for col in missing_cols:
-                if col == 'Current_Handler':
-                    df[col] = "System"
-                elif col == 'Status':
-                    df[col] = "Pending"
-                else:
-                    df[col] = "" 
+        # ถ้ามีคอลัมน์ไม่ครบ หรือ Current_Handler เป็น "System" ให้ซ่อม
+        if missing_cols or 'Current_Handler' in df.columns:
+            for col in expected_columns:
+                if col not in df.columns:
+                    df[col] = "" # สร้างคอลัมน์ว่างไว้ก่อน
+            
+            # 🚑 FIX DATA: ถ้า Handler เป็น System หรือว่างเปล่า ให้ก๊อปจาก Department มาใส่เลย
+            mask = (df['Current_Handler'] == "System") | (df['Current_Handler'].isna()) | (df['Current_Handler'] == "")
+            if 'Department' in df.columns:
+                df.loc[mask, 'Current_Handler'] = df.loc[mask, 'Department']
+            
             df.to_csv(DB_FILE, index=False)
 
 def save_to_db(lot_id, complaint, dept, status, days):
