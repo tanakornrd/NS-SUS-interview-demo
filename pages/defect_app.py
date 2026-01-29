@@ -5,14 +5,14 @@ import csv
 import os
 import datetime
 import pandas as pd
-import time  # <--- ✅ 1. เพิ่มบรรทัดนี้เพื่อใช้ฟังก์ชันนับเวลาถอยหลัง
+import time
 
 # --- 1. Config & Setup ---
 st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wide")
 
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # ยังคงใช้ 2.5-flash ตามความต้องการ (แต่เดี๋ยวเราใส่ระบบรอให้)
+    # ✅ แก้เป็นรุ่น 1.5-flash-latest (เสถียรและรู้จักในไลบรารีใหม่)
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
     st.error("❌ ไม่พบ API Key กรุณาตั้งค่าใน Streamlit Secrets ก่อนครับ")
