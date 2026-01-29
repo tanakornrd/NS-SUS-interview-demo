@@ -67,7 +67,7 @@ with col_display:
     
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
-        st.image(image, caption=f"Monitoring Lot: {lot_number}", width=500) # โชว์เลข Lot ใต้ภาพด้วย
+        st.image(image, caption=f"Monitoring Lot: {lot_number}", width=500)
         
         if st.button("🚀 Run Predictive Analysis", type="primary"):
             if not lot_number:
@@ -115,7 +115,6 @@ with col_display:
                         elif "High" in result_text: risk_level = "High"
                         elif "Medium" in result_text: risk_level = "Medium"
                         
-                        # ส่ง lot_number ไปบันทึกด้วย
                         save_log(current_time, lot_number, machine_temp, pressure, line_speed, result_text, risk_level)
                         st.toast(f"บันทึกข้อมูล Lot {lot_number} เรียบร้อย!", icon="💾")
                         
