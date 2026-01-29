@@ -14,14 +14,13 @@ import io
 DB_FILE = 'tracking_db.csv'
 
 def init_db():
-    # กำหนดคอลัมน์ที่ต้องมีทั้งหมด
     expected_columns = ['Lot_ID', 'Date', 'Complaint', 'Department', 'Status', 'Estimated_Days', 'Current_Handler', 'Action_History', 'Final_Decision', 'Resolution_Note']
     
     if not os.path.exists(DB_FILE):
         df = pd.DataFrame(columns=expected_columns)
         df.to_csv(DB_FILE, index=False)
     else:
-        # 🛠️ AUTO-MIGRATION SYSTEM 🛠️
+        # 🛠️ AUTO-MIGRATION SYSTEM
         df = pd.read_csv(DB_FILE)
         missing_cols = [col for col in expected_columns if col not in df.columns]
         
@@ -32,8 +31,7 @@ def init_db():
                 elif col == 'Status':
                     df[col] = "Pending"
                 else:
-                    df[col] = "" # ค่าว่างสำหรับ Final_Decision, Resolution_Note
-            
+                    df[col] = "" 
             df.to_csv(DB_FILE, index=False)
 
 def save_to_db(lot_id, complaint, dept, status, days):
@@ -107,7 +105,6 @@ global_model = load_model()
 # 3. Helper Functions (Report)
 # ==========================================
 def generate_final_report(case_data):
-    # สร้างจดหมายแจ้งผลเป็นทางการ
     content = f"""
     ========================================
     OFFICIAL RESOLUTION LETTER
@@ -173,12 +170,9 @@ with tab1:
         with c2:
             st.subheader("ผลการตัดสิน (Outcome)")
             if 'Final_Decision' in df.columns:
-                # กรองเอาเฉพาะที่มีค่า
                 outcomes = df[df['Final_Decision'] != ""]['Final_Decision'].value_counts()
                 if not outcomes.empty:
                     st.bar_chart(outcomes)
-                else:
-                    st.info("ยังไม่มีเคสที่ปิดงาน")
     else:
         st.info("ยังไม่มีข้อมูลเคสในระบบ")
 
@@ -207,89 +201,96 @@ with tab2:
     with col2:
         st.info("💡 **AI Auto-Routing**\nระบบจะวิเคราะห์ข้อความและส่งงานไปยังแผนกที่เกี่ยวข้องอัตโนมัติ")
 
-# --- TAB 3: Workflow (หัวใจสำคัญของการตัดสินใจ) ---
+# --- TAB 3: Workflow (ปรับปรุงใหม่: มี Tab แยก History) ---
 with tab3:
     st.header("✅ Workflow & Action Center")
     user_dept = st.selectbox("เลือกฝ่ายของคุณ (Simulate User Role):", ["QC", "R&D", "Logistics", "Customer Service", "System Admin"])
     
+    # สร้าง Sub-Tabs เพื่อแยกงานค้าง กับ งานเสร็จ
+    subtab_active, subtab_history = st.tabs(["⚡ งานรอดำเนินการ (Pending)", "📜 ประวัติงานที่เสร็จแล้ว (History)"])
+
     if not df.empty:
-        my_tasks = pd.DataFrame()
+        # === LOGIC การกรองงาน (FILTERING) ===
+        # 1. กรองงานที่เสร็จแล้ว (Case Closed)
+        completed_tasks = df[df['Status'] == 'Case Closed']
+        
+        # 2. กรองงานที่ยังไม่เสร็จ (Active)
+        active_tasks_all = df[df['Status'] != 'Case Closed']
+        
+        # 3. กรองตาม User Role (สำหรับงาน Active)
+        my_active_tasks = pd.DataFrame()
         if user_dept == "System Admin":
-            my_tasks = df
-            st.warning("⚠️ Admin Mode: Seeing all tasks")
+            my_active_tasks = active_tasks_all # Admin เห็นงานค้างทั้งหมด
         else:
             if 'Current_Handler' in df.columns:
-                # CS เห็นงานที่ส่งมาถึงตัวเอง
-                my_tasks = df[df['Current_Handler'] == user_dept]
-                
-        if not my_tasks.empty:
-            st.write(f"งานที่รอคุณดำเนินการ ({len(my_tasks)} เคส):")
+                my_active_tasks = active_tasks_all[active_tasks_all['Current_Handler'] == user_dept]
+
+        # === SHOW ACTIVE TASKS ===
+        with subtab_active:
+            if user_dept == "System Admin":
+                st.info(f"👀 System Admin Mode: กำลังดูงานค้างทั้งหมดในระบบ ({len(my_active_tasks)} เคส)")
             
-            for index, row in my_tasks.iterrows():
-                # ไม่แสดงงานที่จบไปแล้ว (Case Closed) ในรายการที่ต้องทำ
-                if row['Status'] == 'Case Closed' and user_dept != "System Admin":
-                    continue
-                    
-                with st.expander(f"📌 {row['Lot_ID']} : {str(row['Complaint'])[:40]}..."):
-                    c1, c2 = st.columns([1, 1])
-                    with c1:
-                        st.info(f"**อาการ:** {row['Complaint']}")
-                        st.markdown(f"**History:**")
-                        if pd.notna(row['Action_History']):
-                            for h in str(row['Action_History']).split(' || '):
-                                st.caption(f"• {h}")
-                                
-                    with c2:
-                        st.write("### Action Zone")
+            if not my_active_tasks.empty:
+                for index, row in my_active_tasks.iterrows():
+                    # การ์ดแสดงงาน
+                    with st.container():
+                        st.markdown(f"### 📌 {row['Lot_ID']}")
+                        c1, c2 = st.columns([1, 1])
+                        with c1:
+                            st.info(f"**อาการ:** {row['Complaint']}")
+                            st.markdown(f"**สถานะปัจจุบัน:** `{row['Status']}`")
+                            st.markdown(f"**ผู้รับผิดชอบ:** `{row['Current_Handler']}`")
+                            with st.expander("ดูประวัติ (History)"):
+                                if pd.notna(row['Action_History']):
+                                    for h in str(row['Action_History']).split(' || '):
+                                        st.caption(f"• {h}")
                         
-                        # === กรณีเป็น Customer Service (ผู้ตัดสินใจ) ===
-                        if user_dept == "Customer Service":
-                            st.markdown("#### ⚖️ Final Decision")
-                            
-                            # Dropdown กลยุทธ์การเคลม
-                            decision = st.selectbox(
-                                "ผลการพิจารณา:", 
-                                ["✅ อนุมัติเคลม (Approve)", "🤝 ประนีประนอม/ส่วนลด (Compromise)", "❌ ปฏิเสธการเคลม (Reject)"],
-                                key=f"dec_{row['Lot_ID']}"
-                            )
-                            
-                            # ข้อความที่จะส่งถึงลูกค้า
-                            resolution_msg = st.text_area(
-                                "ข้อความถึงลูกค้า / รายละเอียดการชดเชย:", 
-                                placeholder="เช่น ยินดีมอบส่วนลด 20% ในบิลถัดไป เนื่องจาก...",
-                                key=f"res_{row['Lot_ID']}"
-                            )
-                            
-                            if st.button("🏁 Close Case & Notify Customer", type="primary", key=f"close_{row['Lot_ID']}"):
-                                update_status(
-                                    row['Lot_ID'], 
-                                    "Case Closed", 
-                                    f"CS Decision: {decision}", 
-                                    next_handler="Completed",
-                                    final_decision=decision,
-                                    resolution_note=resolution_msg
-                                )
-                                st.success("✅ ปิดเคสเรียบร้อย! ข้อมูลถูกอัปเดตให้ลูกค้าแล้ว")
-                                st.rerun()
+                        with c2:
+                            st.write("### 🛠️ Action Zone")
+                            # ถ้าเป็น Admin ให้เตือนว่ากำลังแก้ในนามใคร
+                            if user_dept == "System Admin":
+                                st.caption(f"⚠️ คุณกำลังจัดการงานแทนฝ่าย: **{row['Current_Handler']}**")
 
-                        # === กรณีเป็นแผนกอื่น (QC, R&D, Logistics) ===
-                        else:
-                            st.markdown("#### 🛠️ Operation Fix")
-                            action_note = st.text_input("ผลการตรวจสอบ/แก้ไข:", key=f"note_{row['Lot_ID']}")
+                            # Logic ปุ่มกด (แยกตามแผนกที่ถือเรื่อง)
+                            current_handler = row['Current_Handler']
                             
-                            if st.button("ส่งต่อให้ Customer Service", key=f"fwd_{row['Lot_ID']}"):
-                                update_status(
-                                    row['Lot_ID'], 
-                                    "Investigation Complete", 
-                                    f"{user_dept}: {action_note}", 
-                                    next_handler="Customer Service"
-                                )
-                                st.success("ส่งเรื่องต่อให้ CS เจรจากับลูกค้าแล้ว")
-                                st.rerun()
-        else:
-            st.info(f"🎉 ไม่มีงานค้างสำหรับฝ่าย {user_dept}")
+                            # ถ้าเป็นตาของ CS (Customer Service)
+                            if current_handler == "Customer Service":
+                                st.markdown("#### ⚖️ Final Decision")
+                                decision = st.selectbox("ผลการพิจารณา:", 
+                                    ["✅ อนุมัติเคลม (Approve)", "🤝 ประนีประนอม (Compromise)", "❌ ปฏิเสธ (Reject)"],
+                                    key=f"dec_{row['Lot_ID']}")
+                                resolution_msg = st.text_area("ข้อความถึงลูกค้า:", key=f"res_{row['Lot_ID']}")
+                                
+                                if st.button("🏁 Close Case", type="primary", key=f"close_{row['Lot_ID']}"):
+                                    update_status(row['Lot_ID'], "Case Closed", f"CS Decision: {decision}", 
+                                                  next_handler="Completed", final_decision=decision, resolution_note=resolution_msg)
+                                    st.success("ปิดเคสเรียบร้อย! ย้ายไปที่ tab History แล้ว")
+                                    st.rerun()
+                            
+                            # ถ้าเป็นตาของแผนกอื่น (QC, R&D, Logistics)
+                            else:
+                                action_note = st.text_input("ผลการตรวจสอบ:", key=f"note_{row['Lot_ID']}")
+                                if st.button("ส่งต่อให้ Customer Service", key=f"fwd_{row['Lot_ID']}"):
+                                    update_status(row['Lot_ID'], "Investigation Complete", 
+                                                  f"{current_handler}: {action_note}", next_handler="Customer Service")
+                                    st.success("ส่งงานต่อเรียบร้อย!")
+                                    st.rerun()
+                        st.divider()
+            else:
+                st.success(f"🎉 ไม่มีงานค้างสำหรับฝ่าย {user_dept} ครับ")
 
-# --- TAB 4: Customer Tracking (สำหรับลูกค้าดูผล) ---
+        # === SHOW HISTORY ===
+        with subtab_history:
+            st.markdown(f"### 🗂️ รายการที่ปิดเคสแล้วทั้งหมด ({len(completed_tasks)} เคส)")
+            if not completed_tasks.empty:
+                st.dataframe(completed_tasks[['Lot_ID', 'Date', 'Complaint', 'Final_Decision', 'Status']])
+            else:
+                st.info("ยังไม่มีเคสที่ปิดงานเสร็จสิ้น")
+    else:
+        st.info("ไม่มีข้อมูลในระบบ")
+
+# --- TAB 4: Customer Tracking ---
 with tab4:
     st.subheader("🔍 Track Your Claim Status")
     track_id = st.text_input("กรอกเลข Lot ที่ต้องการค้นหา:", placeholder="Enter Lot No...", key="track_input")
@@ -298,56 +299,40 @@ with tab4:
         df_latest = get_all_data()
         if not df_latest.empty:
             result = df_latest[df_latest['Lot_ID'].astype(str) == str(track_id)]
-            
             if not result.empty:
                 res = result.iloc[-1]
                 st.success("✅ พบข้อมูลสินค้า")
                 
-                # Progress Bar
                 status_val = 30
                 status_str = str(res['Status'])
                 if "Investigation" in status_str: status_val = 60
                 if "Case Closed" in status_str: status_val = 100
                 st.progress(status_val)
                 
-                # ข้อมูลทั่วไป
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown(f"**Lot ID:** {res['Lot_ID']}")
-                    st.markdown(f"**Current Status:** `{res['Status']}`")
+                    st.markdown(f"**Status:** `{res['Status']}`")
                 with c2:
-                    st.markdown(f"**Department:** {res['Department']}")
+                    st.markdown(f"**Dept:** {res['Department']}")
                     st.markdown(f"**Handler:** {res['Current_Handler']}")
                 
                 st.divider()
                 
-                # === ไฮไลท์: ส่วนแสดงผลลัพธ์สุดท้าย ===
                 if res['Status'] == 'Case Closed':
-                    st.markdown("### 📢 ผลการพิจารณา (Final Resolution)")
-                    
-                    # กล่องสีแยกตามผลลัพธ์
+                    st.markdown("### 📢 ผลการพิจารณา")
                     decision_text = str(res['Final_Decision'])
-                    if "Approve" in decision_text:
-                        st.success(f"🎉 {decision_text}")
-                    elif "Reject" in decision_text:
-                        st.error(f"⚠️ {decision_text}")
-                    else: # Compromise
-                        st.warning(f"🤝 {decision_text}")
-                        
+                    if "Approve" in decision_text: st.success(f"🎉 {decision_text}")
+                    elif "Reject" in decision_text: st.error(f"⚠️ {decision_text}")
+                    else: st.warning(f"🤝 {decision_text}")
                     st.info(f"**รายละเอียด:**\n{res['Resolution_Note']}")
                     
-                    # ปุ่มดาวน์โหลดจดหมาย
                     report_content = generate_final_report(res)
-                    st.download_button(
-                        label="📄 ดาวน์โหลดจดหมายแจ้งผล (Official Letter)",
-                        data=report_content,
-                        file_name=f"Resolution_{res['Lot_ID']}.txt",
-                        mime="text/plain"
-                    )
+                    st.download_button(label="📄 ดาวน์โหลดจดหมาย (Official Letter)", data=report_content, file_name=f"Resolution_{res['Lot_ID']}.txt")
                 else:
-                    st.info("🕒 เคสนี้กำลังอยู่ในระหว่างการดำเนินการตรวจสอบครับ")
-
-                with st.expander("ดูประวัติการดำเนินการ (Full Timeline)"):
+                    st.info("🕒 กำลังตรวจสอบครับ")
+                    
+                with st.expander("Timeline"):
                     if pd.notna(res['Action_History']):
                         for h in str(res['Action_History']).split(' || '):
                             st.caption(f"• {h}")
