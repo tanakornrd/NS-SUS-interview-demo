@@ -37,7 +37,7 @@ def init_db():
 
 def save_to_db(lot_id, complaint, dept, status, days):
     df = pd.read_csv(DB_FILE)
-    # ตรวจสอบว่า Lot ID ซ้ำหรือไม่ ถ้าซ้ำให้อัปเดต ถ้าไม่ซ้ำให้เพิ่มใหม่ (ในที่นี้ทำแบบเพิ่มใหม่ง่ายๆ)
+    # เพิ่มข้อมูลใหม่
     new_data = pd.DataFrame({
         'Lot_ID': [lot_id],
         'Date': [datetime.now().strftime("%Y-%m-%d %H:%M")],
@@ -149,7 +149,7 @@ with tab1:
         # Metrics หลัก
         col1, col2, col3, col4 = st.columns(4)
         total_cases = len(df)
-        completed_cases = len(df[df['Status'] == 'Completed'])
+        completed_cases = len(df[df['Status'].str.contains('Completed|Fixed', case=False, na=False)])
         pending_cases = total_cases - completed_cases
         
         col1.metric("Total Cases", total_cases)
@@ -163,20 +163,22 @@ with tab1:
         c1, c2 = st.columns(2)
         with c1:
             st.subheader("เคสแยกตามแผนก")
-            dept_counts = df['Department'].value_counts()
-            st.bar_chart(dept_counts)
+            if 'Department' in df.columns:
+                dept_counts = df['Department'].value_counts()
+                st.bar_chart(dept_counts)
             
         with c2:
             st.subheader("สถานะงานปัจจุบัน")
-            status_counts = df['Status'].value_counts()
-            st.bar_chart(status_counts)
+            if 'Status' in df.columns:
+                status_counts = df['Status'].value_counts()
+                st.bar_chart(status_counts)
             
         st.subheader("📋 รายการเคสล่าสุด")
         st.dataframe(df.tail(10))
     else:
         st.info("ยังไม่มีข้อมูลเคสในระบบ")
 
-# --- TAB 2: Submit New Case (เหมือนเดิม + ปรับปรุง) ---
+# --- TAB 2: Submit New Case ---
 with tab2:
     col1, col2 = st.columns([2, 1])
     with col1:
@@ -212,42 +214,41 @@ with tab2:
     with col2:
         st.info("💡 **AI Auto-Routing**\nระบบจะวิเคราะห์ข้อความและส่งงานไปยังแผนกที่เกี่ยวข้องอัตโนมัติ (QC, R&D, Logistics) พร้อมตั้ง Status เริ่มต้นให้ทันที")
 
-# --- TAB 3: Workflow Approval (ฟีเจอร์ใหม่) ---
+# --- TAB 3: Workflow Approval (แก้ Indentation แล้ว) ---
 with tab3:
     st.header("✅ Workflow & Action Center")
     st.caption("จำลองหน้าจอสำหรับเจ้าหน้าที่แต่ละฝ่ายเพื่อเข้ามาอัปเดตงาน")
     
-    # Filter เลือกแผนก (จำลองการ Login)
+    # 1. Filter เลือกแผนก
     user_dept = st.selectbox("เลือกฝ่ายของคุณ (Simulate User Role):", ["QC", "R&D", "Logistics", "Customer Service", "System Admin"])
-    if user_dept == "System Admin":
-            # Admin เห็นงานทั้งหมด
-            my_tasks = df 
-            st.warning("⚠️ คุณกำลังอยู่ในโหมด Admin: เห็นงานทั้งหมดรวมถึงงานที่ยังไม่ระบุฝ่าย")
-        else:
-            # ฝ่ายอื่นเห็นเฉพาะงานตัวเอง
-            my_tasks = df[df['Current_Handler'] == user_dept]
-        
-        if not my_tasks.empty:
-            st.write(f"งานที่รอคุณดำเนินการ ({len(my_tasks)} เคส):")
-            # ... (ส่วนแสดงผลเหมือนเดิม) ...
     
-    # ดึงงานที่ค้างอยู่ที่ฝ่ายนี้ หรือ งานทั้งหมด
+    # 2. Logic กรองงาน
+    my_tasks = pd.DataFrame()
     if not df.empty:
-        # Logic กรองงาน: ดูงานที่ Current_Handler ตรงกับ User หรือดูทั้งหมด
-        my_tasks = df[df['Current_Handler'] == user_dept]
-        
+        if user_dept == "System Admin":
+            my_tasks = df
+            st.warning("⚠️ คุณกำลังอยู่ในโหมด Admin: เห็นงานทั้งหมด")
+        else:
+            # กรองเฉพาะงานที่ Current_Handler ตรงกับ User
+            if 'Current_Handler' in df.columns:
+                my_tasks = df[df['Current_Handler'] == user_dept]
+            else:
+                st.error("ไม่พบคอลัมน์ Current_Handler ในฐานข้อมูล (ลองลบไฟล์ CSV แล้วรันใหม่)")
+
+        # 3. แสดงผลงาน
         if not my_tasks.empty:
             st.write(f"งานที่รอคุณดำเนินการ ({len(my_tasks)} เคส):")
             
             for index, row in my_tasks.iterrows():
-                with st.expander(f"📌 {row['Lot_ID']} : {row['Complaint'][:50]}..."):
+                with st.expander(f"📌 {row['Lot_ID']} : {str(row['Complaint'])[:50]}..."):
                     c1, c2 = st.columns([2, 1])
                     with c1:
                         st.markdown(f"**อาการ:** {row['Complaint']}")
                         st.markdown(f"**สถานะปัจจุบัน:** `{row['Status']}`")
                         st.markdown(f"**History:**")
-                        for h in str(row['Action_History']).split(' || '):
-                            st.text(f"- {h}")
+                        if pd.notna(row['Action_History']):
+                            for h in str(row['Action_History']).split(' || '):
+                                st.text(f"- {h}")
                             
                     with c2:
                         st.write("### Action")
@@ -256,8 +257,8 @@ with tab3:
                         # ปุ่ม Approve / Forward
                         if st.button("✅ Mark as Fixed / Approve", key=f"btn_{row['Lot_ID']}"):
                             update_status(row['Lot_ID'], "Fixed/Resolved", f"{user_dept}: {action_note}", next_handler="Customer Service")
-                            st.success("อัปเดตสถานะเป็น Fixed และส่งต่อให้ Customer Service แล้ว")
-                            st.experimental_rerun()
+                            st.success("อัปเดตสถานะและส่งต่อเรียบร้อย")
+                            st.rerun()
                             
                         # ปุ่ม Download Report
                         report_text = generate_report_file(row)
@@ -273,13 +274,12 @@ with tab3:
     else:
         st.write("ยังไม่มีข้อมูลในระบบ")
 
-# --- TAB 4: Customer Tracking (เหมือนเดิม) ---
+# --- TAB 4: Customer Tracking ---
 with tab4:
     st.subheader("🔍 Track Your Claim Status")
     track_id = st.text_input("กรอกเลข Lot ที่ต้องการค้นหา:", placeholder="Enter Lot No...", key="track_input")
     
     if st.button("🔎 Search", key="track_btn"):
-        # อ่านไฟล์ใหม่เสมอเพื่อให้ได้ข้อมูลล่าสุด
         df_latest = get_all_data()
         if not df_latest.empty:
             result = df_latest[df_latest['Lot_ID'].astype(str) == str(track_id)]
@@ -288,11 +288,12 @@ with tab4:
                 res = result.iloc[-1]
                 st.success("✅ พบข้อมูลสินค้า")
                 
-                # Progress Bar ตามสถานะ (Mock logic)
+                # Progress Bar
                 status_val = 20
-                if "Assigned" in res['Status']: status_val = 40
-                if "Fixed" in res['Status']: status_val = 80
-                if "Completed" in res['Status']: status_val = 100
+                status_str = str(res['Status'])
+                if "Assigned" in status_str: status_val = 40
+                if "Fixed" in status_str: status_val = 80
+                if "Completed" in status_str: status_val = 100
                 st.progress(status_val)
                 
                 c1, c2 = st.columns(2)
@@ -304,7 +305,8 @@ with tab4:
                     st.markdown(f"**Handler:** {res['Current_Handler']}")
                 
                 with st.expander("ดูประวัติการดำเนินการ (Timeline)"):
-                    for h in str(res['Action_History']).split(' || '):
-                        st.write(f"• {h}")
+                    if pd.notna(res['Action_History']):
+                        for h in str(res['Action_History']).split(' || '):
+                            st.write(f"• {h}")
             else:
                 st.error("ไม่พบข้อมูล Lot ID นี้")
