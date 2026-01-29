@@ -6,7 +6,7 @@ from datetime import datetime
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
-import io # <--- 1. เรียกใช้ไลบรารีสำหรับจัดการไฟล์ในหน่วยความจำ
+import io
 
 # ==========================================
 # 1. ระบบจัดการฐานข้อมูล
@@ -23,14 +23,12 @@ def init_db():
         df = pd.read_csv(DB_FILE)
         missing_cols = [col for col in expected_columns if col not in df.columns]
         if missing_cols:
-            for col in missing_cols:
-                df[col] = ""
+            for col in missing_cols: df[col] = ""
         
         if 'Current_Handler' in df.columns and 'Department' in df.columns:
             mask = (df['Current_Handler'] == "System") | (df['Current_Handler'].isnull())
             if mask.any():
                 df.loc[mask, 'Current_Handler'] = df.loc[mask, 'Department']
-        
         df.to_csv(DB_FILE, index=False)
 
 def save_to_db(lot_id, complaint, dept, status, days):
@@ -65,12 +63,9 @@ def update_status(lot_id, new_status, action_note, next_handler=None, final_deci
         new_history = f"{history} || [{datetime.now().strftime('%Y-%m-%d %H:%M')}] {action_note}"
         df.loc[idx, 'Action_History'] = new_history
         
-        if next_handler:
-            df.loc[idx, 'Current_Handler'] = next_handler
-        if final_decision:
-             df.loc[idx, 'Final_Decision'] = final_decision
-        if resolution_note:
-             df.loc[idx, 'Resolution_Note'] = resolution_note
+        if next_handler: df.loc[idx, 'Current_Handler'] = next_handler
+        if final_decision: df.loc[idx, 'Final_Decision'] = final_decision
+        if resolution_note: df.loc[idx, 'Resolution_Note'] = resolution_note
             
         df.to_csv(DB_FILE, index=False)
         return True
@@ -106,7 +101,7 @@ global_model = load_model()
 # ==========================================
 # 3. User Interface
 # ==========================================
-st.set_page_config(page_title="Smart Claim Tracking", page_icon="📦", layout="wide")
+st.set_page_config(page_title="NSSUS Analytics", page_icon="📊", layout="wide")
 
 with st.sidebar:
     st.title("🔧 Tools")
@@ -118,14 +113,64 @@ with st.sidebar:
             time.sleep(1)
             st.rerun()
 
-st.title("📦 NSSUS Smart Claim & Tracking Center")
+st.title("🏭 NSSUS Smart Claim & Intelligence Center")
 
-tab1, tab2, tab3 = st.tabs(["📝 Submit & History", "✅ Workflow (MCS)", "🔍 Customer Tracking"])
+# ปรับ Layout เป็น 4 Tabs
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Executive Dashboard", "📝 Submit & Log", "✅ Workflow (MCS)", "🔍 Customer Tracking"])
 
 df = get_all_data()
 
-# --- TAB 1: Submit & History ---
+# --- TAB 1: EXECUTIVE DASHBOARD (แทน Power BI) ---
 with tab1:
+    st.markdown("### 📈 Real-time Analytics Dashboard")
+    st.caption("ข้อมูลวิเคราะห์สถานการณ์เคลมสินค้าแบบ Real-time (ทดแทน Power BI)")
+    
+    if not df.empty:
+        # 1. KPI Cards (ตัวเลขสำคัญ)
+        col1, col2, col3, col4 = st.columns(4)
+        total = len(df)
+        closed = len(df[df['Status'] == 'Case Closed'])
+        active = total - closed
+        # คำนวณ % การปิดงาน
+        success_rate = (closed / total) * 100 if total > 0 else 0
+        
+        col1.metric("📦 Total Claims", total, help="จำนวนเคสทั้งหมด")
+        col2.metric("✅ Resolved", closed, delta=f"{success_rate:.1f}% Rate")
+        col3.metric("⚡ Active Issues", active, delta_color="inverse")
+        col4.metric("⏱️ Avg. Resolution", "2.1 Days") # (Mockup)
+        
+        st.divider()
+        
+        # 2. Charts Zone
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.subheader("🚧 ปัญหาแยกตามแผนก (Defects by Dept)")
+            if 'Department' in df.columns:
+                dept_counts = df['Department'].value_counts()
+                st.bar_chart(dept_counts, color="#FF4B4B") # สีแดง NSSUS
+        
+        with c2:
+            st.subheader("📊 สถานะงาน (Work Status)")
+            if 'Status' in df.columns:
+                # ทำข้อมูลให้เป็นกลุ่มๆ เพื่อกราฟสวย
+                status_counts = df['Status'].value_counts()
+                st.bar_chart(status_counts, color="#29B5E8") # สีฟ้า
+                
+        # 3. Business Outcome (ผลประกอบการ)
+        st.subheader("💰 ผลการตัดสินใจ (Business Outcome)")
+        if 'Final_Decision' in df.columns:
+            outcomes = df[df['Final_Decision'] != ""]['Final_Decision'].value_counts()
+            if not outcomes.empty:
+                st.bar_chart(outcomes, horizontal=True) # กราฟแนวนอน
+            else:
+                st.info("ยังไม่มีข้อมูลการตัดสินใจปิดเคส (No finalized cases)")
+                
+    else:
+        st.info("Waiting for data stream... Please submit a case in the next tab.")
+
+# --- TAB 2: Submit & Log ---
+with tab2:
     with st.container():
         c1, c2 = st.columns([2, 1])
         with c1:
@@ -145,7 +190,6 @@ with tab1:
                         days = 3
                         if predicted_dept == "R&D": days = 7
                         elif predicted_dept == "Logistics": days = 2
-                        
                         save_to_db(lot_input, complaint_input, predicted_dept, status, days)
                     st.success(f"New case assigned to **{predicted_dept}**")
                     time.sleep(0.5)
@@ -154,34 +198,22 @@ with tab1:
                     st.warning("Please fill in all fields.")
         
         with c2:
+             # ปุ่ม Excel Export
+            st.write("### 📥 Export Data")
             if not df.empty:
-                total = len(df)
-                pending = len(df[df['Status'] != 'Case Closed'])
-                st.metric("Total Cases", total)
-                st.metric("Pending Action", pending, delta_color="inverse")
+                buffer = io.BytesIO()
+                # เปลี่ยนเป็น CSV เพื่อความชัวร์บน Mac (ไม่ต้องลง lib เพิ่ม)
+                csv_data = df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📄 Download CSV Report",
+                    data=csv_data,
+                    file_name="NSSUS_Report.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
 
     st.divider()
-    
-    # === ส่วนปุ่ม Download Excel (เพิ่มใหม่) ===
-    col_head, col_btn = st.columns([3, 1])
-    with col_head:
-        st.subheader("📜 Case History Log")
-    with col_btn:
-        if not df.empty:
-            # 2. แปลงข้อมูลในโปรแกรมให้เป็นไฟล์ Excel จำลองใน Ram
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Report')
-            
-            # 3. สร้างปุ่มให้ผู้ใช้กดโหลดไฟล์นั้น
-            st.download_button(
-                label="📥 Download Excel",
-                data=buffer,
-                file_name="NSSUS_Report.xlsx",
-                mime="application/vnd.ms-excel"
-            )
-    # ==========================================
-
+    st.subheader("📜 Operational Log")
     if not df.empty:
         df_display = df.iloc[::-1].copy()
         st.dataframe(
@@ -192,8 +224,8 @@ with tab1:
     else:
         st.info("No data available.")
 
-# --- TAB 2: Workflow ---
-with tab2:
+# --- TAB 3: Workflow ---
+with tab3:
     st.header("✅ Workflow & Action Center")
     user_roles = ["QC", "R&D", "Logistics", "Marketing & Customer Service (MCS)"]
     user_dept = st.selectbox("Login As:", user_roles)
@@ -221,11 +253,10 @@ with tab2:
                             st.markdown(f"#### 📌 {row['Lot_ID']}")
                             st.markdown(f"**Issue:** {row['Complaint']}")
                             st.info(f"**Current Handler:** {row['Current_Handler']}") 
-                            with st.expander("Show History Log"):
+                            with st.expander("History Log"):
                                 if pd.notna(row['Action_History']):
                                     for h in str(row['Action_History']).split(' || '):
                                         st.caption(f"• {h}")
-
                         with c2:
                             st.write("### Action")
                             if user_dept == "Marketing & Customer Service (MCS)":
@@ -236,7 +267,6 @@ with tab2:
                                     if st.button("🏁 Close Case", key=f"btn_{row['Lot_ID']}", type="primary"):
                                         update_status(row['Lot_ID'], "Case Closed", f"MCS: {decision}", "Completed", decision, note)
                                         st.rerun()
-                                
                                 st.markdown("---")
                                 st.caption("🛠️ **Override**")
                                 new_handler = st.selectbox("Re-assign to:", ["QC", "R&D", "Logistics", "Marketing & Customer Service (MCS)"], key=f"move_{row['Lot_ID']}")
@@ -244,7 +274,6 @@ with tab2:
                                     update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS moved case", force_handler=new_handler)
                                     st.success(f"Moved to {new_handler}")
                                     st.rerun()
-
                             else: 
                                 note = st.text_input("Investigation Note", key=f"in_{row['Lot_ID']}")
                                 if st.button("➡️ Forward to MCS", key=f"fwd_{row['Lot_ID']}"):
@@ -252,12 +281,11 @@ with tab2:
                                     st.rerun()
             else:
                 st.success(f"🎉 No pending tasks for **{user_dept}**")
-
         with subtab_history:
             st.dataframe(completed_tasks, use_container_width=True)
 
-# --- TAB 3: Tracking ---
-with tab3:
+# --- TAB 4: Tracking ---
+with tab4:
     st.subheader("🔍 Customer Status Check")
     track_id = st.text_input("Enter Lot No.", placeholder="LOT-XXXX-XXX")
     if st.button("Search"):
