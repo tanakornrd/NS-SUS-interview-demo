@@ -32,46 +32,38 @@ st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wi
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # 🧠 SYSTEM: MODEL DISCOVERY (ถาม Server ว่ามีโมเดลอะไรบ้าง)
-    # เราจะไม่เดาชื่อแล้ว เราจะให้ Server บอกมาเลย
-    valid_model = None
-    try:
-        # ดึงรายชื่อโมเดลทั้งหมดที่ API Key นี้ใช้ได้
-        model_list = []
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                model_list.append(m.name)
-        
-        # แสดงเวอร์ชันและรายชื่อโมเดลใน Sidebar (เพื่อ Debug)
-        st.sidebar.header("🔧 System Status")
-        st.sidebar.text(f"Lib Version: {genai.__version__}")
-        
-        # Logic เลือกโมเดลอัตโนมัติ (Flash > Pro > Vision)
-        target_keywords = ['flash', 'gemini-1.5', 'vision']
-        
-        for keyword in target_keywords:
-            for m_name in model_list:
-                if keyword in m_name:
-                    valid_model = genai.GenerativeModel(m_name)
-                    st.sidebar.success(f"Active Model: {m_name}")
-                    break
-            if valid_model: break
-        
-        # ถ้าหาไม่เจอจริงๆ ให้ User เลือกเองจาก Dropdown ที่ Sidebar
-        if not valid_model:
-            st.sidebar.error("Auto-detect failed. Please select:")
-            selected = st.sidebar.selectbox("Manual Select:", model_list)
-            if selected:
-                valid_model = genai.GenerativeModel(selected)
-
-    except Exception as e:
-        st.error(f"Connection Error: {e}")
-        st.stop()
-        
-    if valid_model:
-        model = valid_model
+    # 🎯 UNIVERSAL MODEL SELECTOR (ระบบสุ่มหาโมเดลที่ใช้ได้จริง)
+    # รายชื่อโมเดลที่เราจะไล่เช็กทีละตัว (เรียงจากดีสุดไปหาตัวกันตาย)
+    candidate_models = [
+        'gemini-1.5-flash',          # 1. ลองตัวมาตรฐานก่อน
+        'gemini-1.5-flash-latest',   # 2. ลองตัว latest
+        'gemini-1.5-flash-001',      # 3. ลองระบุรหัสรุ่น
+        'gemini-1.5-flash-002',      # 4. ลองรุ่นอัปเดต
+        'gemini-1.5-pro',            # 5. ถ้า Flash ไม่ได้ ลอง Pro
+        'gemini-pro-vision'          # 6. ไม้ตายสุดท้าย (รุ่นเก่า)
+    ]
+    
+    active_model = None
+    
+    # วนลูปหาตัวที่เชื่อมต่อติด
+    for model_name in candidate_models:
+        try:
+            temp_model = genai.GenerativeModel(model_name)
+            # ลองยิงคำสั่ง Test สั้นๆ
+            temp_model.generate_content("test")
+            # ถ้าผ่านบรรทัดบนมาได้ แสดงว่าใช้ตัวนี้ได้
+            active_model = temp_model
+            st.toast(f"✅ Connected to: {model_name}", icon="🚀")
+            break # เจอแล้วหยุดหาทันที
+        except Exception as e:
+            # ถ้าตัวนี้พัง ให้ข้ามไปตัวถัดไปเงียบๆ
+            continue
+            
+    if active_model:
+        model = active_model
     else:
-        st.error("❌ CRITICAL: ไม่พบโมเดลที่รองรับ (กรุณาเช็ก API Key หรือ Library)")
+        # ถ้าวนครบทุกตัวแล้วยังไม่ได้อีก (เป็นไปได้ยากมาก)
+        st.error("❌ CRITICAL: ไม่สามารถเชื่อมต่อกับ AI Model ใดๆ ได้เลย กรุณาเช็ก API Key")
         st.stop()
 
 else:
