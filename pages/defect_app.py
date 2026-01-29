@@ -109,4 +109,23 @@ with col_display:
                         st.write(result_text)
                         
                         # บันทึก Log
-                        current_time
+                        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        risk_level = "Low"
+                        if "Critical" in result_text: risk_level = "Critical"
+                        elif "High" in result_text: risk_level = "High"
+                        elif "Medium" in result_text: risk_level = "Medium"
+                        
+                        # ส่ง lot_number ไปบันทึกด้วย
+                        save_log(current_time, lot_number, machine_temp, pressure, line_speed, result_text, risk_level)
+                        st.toast(f"บันทึกข้อมูล Lot {lot_number} เรียบร้อย!", icon="💾")
+                        
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+    else:
+        st.info("Waiting for CCTV Input...")
+
+st.divider()
+st.subheader("📜 Production History Log")
+if os.path.isfile('defect_history.csv'):
+    df = pd.read_csv('defect_history.csv')
+    st.dataframe(df.sort_values(by="Timestamp", ascending=False), use_container_width=True)
