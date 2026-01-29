@@ -6,12 +6,11 @@ from datetime import datetime
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
-import io
+import io # <--- 1. เรียกใช้ไลบรารีสำหรับจัดการไฟล์ในหน่วยความจำ
 
 # ==========================================
 # 1. ระบบจัดการฐานข้อมูล
 # ==========================================
-# เปลี่ยนชื่อไฟล์เล็กน้อยเพื่อให้ระบบสร้างไฟล์ใหม่ที่มีโครงสร้างล่าสุด
 DB_FILE = 'tracking_db_v3_mcs.csv' 
 
 def init_db():
@@ -21,14 +20,12 @@ def init_db():
         df = pd.DataFrame(columns=expected_columns)
         df.to_csv(DB_FILE, index=False)
     else:
-        # Auto-Fixer
         df = pd.read_csv(DB_FILE)
         missing_cols = [col for col in expected_columns if col not in df.columns]
         if missing_cols:
             for col in missing_cols:
                 df[col] = ""
         
-        # 🚑 Fix System Handler
         if 'Current_Handler' in df.columns and 'Department' in df.columns:
             mask = (df['Current_Handler'] == "System") | (df['Current_Handler'].isnull())
             if mask.any():
@@ -57,12 +54,10 @@ def update_status(lot_id, new_status, action_note, next_handler=None, final_deci
     df = pd.read_csv(DB_FILE)
     idx = df[df['Lot_ID'].astype(str) == str(lot_id)].index
     if not idx.empty:
-        # Logic สำหรับการย้ายงาน (Force Move)
         if force_handler:
             df.loc[idx, 'Current_Handler'] = force_handler
-            # ถ้าเป็นการย้ายงาน สถานะอาจจะเปลี่ยนกลับไปเป็น Pending Investigation
             if "Case Closed" not in new_status: 
-                 df.loc[idx, 'Department'] = force_handler # อัปเดต Department หลักตามไปด้วย
+                 df.loc[idx, 'Department'] = force_handler
             action_note += f" (Management re-assigned to {force_handler})"
 
         df.loc[idx, 'Status'] = new_status
@@ -113,10 +108,8 @@ global_model = load_model()
 # ==========================================
 st.set_page_config(page_title="Smart Claim Tracking", page_icon="📦", layout="wide")
 
-# --- SIDEBAR: เครื่องมือล้างฐานข้อมูล ---
 with st.sidebar:
     st.title("🔧 Tools")
-    st.info("กดปุ่มด้านล่างเพื่อล้างข้อมูลทั้งหมดและเริ่ม Demo ใหม่")
     if st.button("🗑️ Reset Database (Clear All)", type="primary"):
         if os.path.exists(DB_FILE):
             os.remove(DB_FILE)
@@ -168,7 +161,27 @@ with tab1:
                 st.metric("Pending Action", pending, delta_color="inverse")
 
     st.divider()
-    st.subheader("📜 Case History Log")
+    
+    # === ส่วนปุ่ม Download Excel (เพิ่มใหม่) ===
+    col_head, col_btn = st.columns([3, 1])
+    with col_head:
+        st.subheader("📜 Case History Log")
+    with col_btn:
+        if not df.empty:
+            # 2. แปลงข้อมูลในโปรแกรมให้เป็นไฟล์ Excel จำลองใน Ram
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Report')
+            
+            # 3. สร้างปุ่มให้ผู้ใช้กดโหลดไฟล์นั้น
+            st.download_button(
+                label="📥 Download Excel",
+                data=buffer,
+                file_name="NSSUS_Report.xlsx",
+                mime="application/vnd.ms-excel"
+            )
+    # ==========================================
+
     if not df.empty:
         df_display = df.iloc[::-1].copy()
         st.dataframe(
@@ -182,8 +195,6 @@ with tab1:
 # --- TAB 2: Workflow ---
 with tab2:
     st.header("✅ Workflow & Action Center")
-    
-    # รวม Role Admin เข้ากับ MCS แล้ว
     user_roles = ["QC", "R&D", "Logistics", "Marketing & Customer Service (MCS)"]
     user_dept = st.selectbox("Login As:", user_roles)
     
@@ -194,14 +205,10 @@ with tab2:
         active_tasks_all = df[df['Status'] != 'Case Closed']
         
         my_active_tasks = pd.DataFrame()
-        
-        # === LOGIC การมองเห็นงาน ===
-        # ถ้าเป็น MCS (หรือ Admin เก่า) ให้เห็นงานทั้งหมด!
         if user_dept == "Marketing & Customer Service (MCS)":
             my_active_tasks = active_tasks_all
-            st.success("👑 MCS Mode: You have full visibility and control over all active tasks.")
+            st.success("👑 MCS Mode: Full control active.")
         else:
-            # ถ้าเป็นแผนกอื่น เห็นแค่งานตัวเอง
             if 'Current_Handler' in df.columns:
                 my_active_tasks = active_tasks_all[active_tasks_all['Current_Handler'] == user_dept]
 
@@ -210,26 +217,18 @@ with tab2:
                 for index, row in my_active_tasks.iterrows():
                     with st.container(border=True):
                         c1, c2 = st.columns([1.5, 1])
-                        
-                        # --- ข้อมูลงาน ---
                         with c1:
                             st.markdown(f"#### 📌 {row['Lot_ID']}")
                             st.markdown(f"**Issue:** {row['Complaint']}")
                             st.info(f"**Current Handler:** {row['Current_Handler']}") 
-                            
                             with st.expander("Show History Log"):
                                 if pd.notna(row['Action_History']):
                                     for h in str(row['Action_History']).split(' || '):
                                         st.caption(f"• {h}")
 
-                        # --- ปุ่มสั่งการ (Action) ---
                         with c2:
                             st.write("### Action")
-                            
-                            # ถ้าเป็น MCS: จะมีปุ่มพิเศษ (Super Power)
                             if user_dept == "Marketing & Customer Service (MCS)":
-                                
-                                # 1. ถ้างานอยู่ที่ตัวเอง -> ตัดสินใจปิดเคสได้
                                 if row['Current_Handler'] == "Marketing & Customer Service (MCS)":
                                     st.markdown("##### ⚖️ Final Decision")
                                     decision = st.selectbox("Decision", ["Approve", "Compromise", "Reject"], key=f"d_{row['Lot_ID']}")
@@ -238,19 +237,16 @@ with tab2:
                                         update_status(row['Lot_ID'], "Case Closed", f"MCS: {decision}", "Completed", decision, note)
                                         st.rerun()
                                 
-                                # 2. ฟีเจอร์ Admin Override: ย้ายงานได้เสมอ ไม่ว่างานจะอยู่ที่ใคร
                                 st.markdown("---")
-                                st.caption("🛠️ **Management Override**")
+                                st.caption("🛠️ **Override**")
                                 new_handler = st.selectbox("Re-assign to:", ["QC", "R&D", "Logistics", "Marketing & Customer Service (MCS)"], key=f"move_{row['Lot_ID']}")
                                 if st.button("Force Move", key=f"btn_move_{row['Lot_ID']}"):
                                     update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS moved case", force_handler=new_handler)
                                     st.success(f"Moved to {new_handler}")
                                     st.rerun()
 
-                            # ถ้าเป็นแผนกอื่น (QC, R&D, Logistics)
                             else: 
                                 note = st.text_input("Investigation Note", key=f"in_{row['Lot_ID']}")
-                                # ส่งต่อให้ MCS
                                 if st.button("➡️ Forward to MCS", key=f"fwd_{row['Lot_ID']}"):
                                     update_status(row['Lot_ID'], "Investigation Complete", f"{user_dept}: {note}", "Marketing & Customer Service (MCS)")
                                     st.rerun()
@@ -260,7 +256,7 @@ with tab2:
         with subtab_history:
             st.dataframe(completed_tasks, use_container_width=True)
 
-# --- TAB 3: Customer Tracking ---
+# --- TAB 3: Tracking ---
 with tab3:
     st.subheader("🔍 Customer Status Check")
     track_id = st.text_input("Enter Lot No.", placeholder="LOT-XXXX-XXX")
@@ -272,7 +268,6 @@ with tab3:
                 r = res.iloc[-1]
                 st.success("✅ Found Case")
                 st.progress(100 if r['Status'] == 'Case Closed' else 50)
-                
                 c1, c2 = st.columns(2)
                 with c1:
                     st.write(f"**Lot ID:** {r['Lot_ID']}")
@@ -280,7 +275,6 @@ with tab3:
                 with c2:
                     st.write(f"**Dept:** {r['Department']}")
                     st.write(f"**Handler:** {r['Current_Handler']}")
-                
                 if r['Status'] == 'Case Closed':
                     st.divider()
                     st.info(f"**Final Decision:** {r['Final_Decision']}\n\n**Note:** {r['Resolution_Note']}")
