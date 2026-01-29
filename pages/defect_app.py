@@ -1,17 +1,25 @@
 import streamlit as st
-import google.generativeai as genai
-from PIL import Image
-import csv
 import os
-import datetime
-import pandas as pd
-import time
+import sys
+import subprocess
 
-import streamlit as st
-import google.generativeai as genai
+# --- 0. FORCE UPGRADE (บังคับอัปเกรดสมอง AI เดี๋ยวนี้!) ---
+# โค้ดส่วนนี้จะเช็กเวอร์ชัน และบังคับโหลดตัวใหม่ถ้า Server ยังใช้ตัวเก่า
+try:
+    import google.generativeai as genai
+    current_version = genai.__version__
+    # ถ้าเวอร์ชันเก่ากว่า 0.8.3 ให้สั่งลงใหม่ทันที
+    if current_version < "0.8.3":
+        st.toast(f"🔧 Updating AI Library from {current_version}...", icon="🔄")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "google-generativeai>=0.8.3"])
+        import google.generativeai as genai # โหลดใหม่
+except Exception as e:
+    # ถ้ายังไม่มี ก็สั่งลงเลย
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "google-generativeai>=0.8.3"])
+    import google.generativeai as genai
+
 from PIL import Image
 import csv
-import os
 import datetime
 import pandas as pd
 import time
@@ -22,13 +30,19 @@ st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wi
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # ✅ กลับมาใช้รุ่น 1.5 Flash (พระเอกตัวจริง)
-    # รอบนี้จะใช้ได้ชัวร์ เพราะเราอัปเกรด requirements.txt แล้ว
-    model = genai.GenerativeModel('gemini-1.5-flash')
-
+    # ✅ ใช้ Model ตัวเก่ง (1.5 Flash) ได้เลย เพราะเราบังคับอัปเกรดแล้ว
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        # เช็กการเชื่อมต่อเบาๆ 1 ที
+        model.generate_content("test")
+    except Exception as e:
+        st.error(f"AI Error: {e}")
+        st.stop()
 else:
-    st.error("❌ ไม่พบ API Key กรุณาตั้งค่าใน Streamlit Secrets ก่อนครับ")
+    st.error("❌ ไม่พบ API Key (กรุณาใส่รหัสใหม่ใน Secrets)")
     st.stop()
+
+# ... (ส่วนที่เหลือของโค้ด ตั้งแต่ def save_log เป็นต้นไป ปล่อยไว้เหมือนเดิมครับ) ...
 
 # --- 🧠 KNOWLEDGE BASE (สมองของระบบ) ---
 LINE_CONFIG = {
