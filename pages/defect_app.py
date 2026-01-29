@@ -4,23 +4,17 @@ import sys
 import subprocess
 import time
 
-# --- 0. NUCLEAR INSTALLATION (สูตรล้างเครื่อง) ---
-# ส่วนนี้จะทำงานก่อนทุกอย่าง เพื่อบังคับลงไลบรารีใหม่ล่าสุดให้ได้
+# --- 0. FORCE UPDATE SYSTEM ---
 try:
     import google.generativeai as genai
-    current_ver = genai.__version__
-    
-    # ถ้าเวอร์ชันเก่ากว่า 0.8.3 สั่งลบและลงใหม่ทันที
-    if current_ver < "0.8.3":
-        st.toast(f"Found old library v{current_ver}. Upgrading...", icon="🔄")
+    # ถ้า Library เก่าเกินไป ให้บังคับลงใหม่
+    if genai.__version__ < "0.8.3":
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "google-generativeai>=0.8.3"])
-        st.rerun() # รีสตาร์ทแอปทันที
+        st.rerun()
 except:
-    # ถ้ายังไม่มี ก็สั่งลงเลย
     subprocess.check_call([sys.executable, "-m", "pip", "install", "google-generativeai>=0.8.3"])
     st.rerun()
 
-# --- เริ่มต้น Import ปกติ ---
 import google.generativeai as genai
 from PIL import Image
 import csv
@@ -98,9 +92,7 @@ LINE_CONFIG = {
 # --- 3. Save Function ---
 def save_log(timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defect_type, risk_level):
     file_name = 'production_logs_v2.csv'
-    # Check if file exists to determine if header is needed
     header_needed = not os.path.isfile(file_name)
-    
     with open(file_name, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         if header_needed:
@@ -173,6 +165,7 @@ with col_right:
                 response = model.generate_content([prompt, image])
                 result_text = response.text
                 
+                status = "PASS"
                 if "[STATUS]: FAIL" in result_text or "Critical" in result_text:
                     st.error(f"🚨 FAIL: Defect Detected")
                     status = "FAIL"
@@ -188,7 +181,11 @@ with col_right:
                 save_log(current_time, selected_line_name, lot_number, p1_val, p2_val, p3_val, status, "AI Check", "Low")
                 
             except Exception as e:
-                st.error(f"Processing Error: {e}")
+                # ถ้า Error ให้แจ้งเตือน แต่ถ้าเป็น 429 (Quota) ให้บอกให้รอ
+                if "429" in str(e):
+                    st.warning("⚠️ High Traffic (Quota Limit). Please wait 20 seconds and try again.")
+                else:
+                    st.error(f"Processing Error: {e}")
 
 # History
 st.divider()
