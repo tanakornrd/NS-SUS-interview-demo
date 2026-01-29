@@ -218,7 +218,18 @@ with tab3:
     st.caption("จำลองหน้าจอสำหรับเจ้าหน้าที่แต่ละฝ่ายเพื่อเข้ามาอัปเดตงาน")
     
     # Filter เลือกแผนก (จำลองการ Login)
-    user_dept = st.selectbox("เลือกฝ่ายของคุณ (Simulate User Role):", ["QC", "R&D", "Logistics", "Customer Service"])
+    user_dept = st.selectbox("เลือกฝ่ายของคุณ (Simulate User Role):", ["QC", "R&D", "Logistics", "Customer Service", "System Admin"])
+    if user_dept == "System Admin":
+            # Admin เห็นงานทั้งหมด
+            my_tasks = df 
+            st.warning("⚠️ คุณกำลังอยู่ในโหมด Admin: เห็นงานทั้งหมดรวมถึงงานที่ยังไม่ระบุฝ่าย")
+        else:
+            # ฝ่ายอื่นเห็นเฉพาะงานตัวเอง
+            my_tasks = df[df['Current_Handler'] == user_dept]
+        
+        if not my_tasks.empty:
+            st.write(f"งานที่รอคุณดำเนินการ ({len(my_tasks)} เคส):")
+            # ... (ส่วนแสดงผลเหมือนเดิม) ...
     
     # ดึงงานที่ค้างอยู่ที่ฝ่ายนี้ หรือ งานทั้งหมด
     if not df.empty:
