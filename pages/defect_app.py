@@ -7,18 +7,25 @@ import datetime
 import pandas as pd
 import time
 
+import streamlit as st
+import google.generativeai as genai
+from PIL import Image
+import csv
+import os
+import datetime
+import pandas as pd
+import time
+
 # --- 1. Config & Setup ---
 st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wide")
 
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # ✅ FIX: ใช้ 'gemini-pro-vision' เพื่อความชัวร์สูงสุด
-    # รุ่นนี้รองรับ Image + Text และทำงานได้บน Library เวอร์ชันเก่า
-    try:
-        model = genai.GenerativeModel('gemini-pro-vision')
-    except Exception as e:
-        st.error(f"Model Error: {e}")
+    # ✅ กลับมาใช้รุ่น 1.5 Flash (พระเอกตัวจริง)
+    # รอบนี้จะใช้ได้ชัวร์ เพราะเราอัปเกรด requirements.txt แล้ว
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
 else:
     st.error("❌ ไม่พบ API Key กรุณาตั้งค่าใน Streamlit Secrets ก่อนครับ")
     st.stop()
