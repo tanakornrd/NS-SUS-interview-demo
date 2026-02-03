@@ -70,7 +70,7 @@ def save_log(timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defec
         writer.writerow([timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defect_type, risk_level])
 
 # --- 4. UI Layout ---
-st.title("NSSUS Defect Inspection")
+st.title("NS-SUS Defect Inspection")
 st.markdown("---")
 
 st.subheader("Select Production Line")
