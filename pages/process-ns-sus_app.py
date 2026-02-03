@@ -101,7 +101,7 @@ global_model = load_model()
 # ==========================================
 # 3. User Interface
 # ==========================================
-st.set_page_config(page_title="NSSUS Analytics", page_icon="📊", layout="wide")
+st.set_page_config(page_title="NS-SUS Smart Claim & Tracking", layout="wide")
 
 with st.sidebar:
     st.title("🔧 Tools")
