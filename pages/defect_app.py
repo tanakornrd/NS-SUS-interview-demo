@@ -70,10 +70,10 @@ def save_log(timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defec
         writer.writerow([timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defect_type, risk_level])
 
 # --- 4. UI Layout ---
-st.title("🏭 NSSUS Universal Process QA")
+st.title("NSSUS Defect Inspection")
 st.markdown("---")
 
-st.subheader("📍 Select Production Line")
+st.subheader("Select Production Line")
 selected_line_name = st.selectbox("Choose Process Unit:", list(LINE_CONFIG.keys()))
 current_config = LINE_CONFIG[selected_line_name]
 
@@ -82,19 +82,19 @@ st.markdown(f"**active Module:** `{current_config['Product']}`")
 with st.container(border=True):
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.markdown("**📦 Lot Number**")
+        st.markdown("**Lot Number**")
         lot_number = st.text_input("Lot No.", value="LOT-2026-X001", label_visibility="collapsed")
     with c2:
         p1_cfg = current_config['Param1']
-        st.markdown(f"**⚙️ {p1_cfg['name']}**")
+        st.markdown(f"**{p1_cfg['name']}**")
         p1_val = st.number_input("P1", value=p1_cfg['default'], label_visibility="collapsed")
     with c3:
         p2_cfg = current_config['Param2']
-        st.markdown(f"**⚙️ {p2_cfg['name']}**")
+        st.markdown(f"**{p2_cfg['name']}**")
         p2_val = st.number_input("P2", value=p2_cfg['default'], label_visibility="collapsed")
     with c4:
         p3_cfg = current_config['Param3']
-        st.markdown(f"**⏩ {p3_cfg['name']}**")
+        st.markdown(f"**{p3_cfg['name']}**")
         p3_val = st.number_input("P3", value=p3_cfg['default'], label_visibility="collapsed")
 
 st.markdown("---")
@@ -102,7 +102,7 @@ st.markdown("---")
 col_left, col_right = st.columns([1, 1])
 
 with col_left:
-    st.subheader("1️⃣ Visual Inspection")
+    st.subheader("Visual Inspection (ของจริงอาจใช้ภาพจาก CCTV)")
     uploaded_file = st.file_uploader(f"Upload Image", type=["jpg", "png", "jpeg"])
     
     if uploaded_file:
@@ -112,7 +112,7 @@ with col_left:
         run_btn = st.button("🚀 Run Expert Analysis", type="primary", use_container_width=True)
 
 with col_right:
-    st.subheader("2️⃣ AI Expert Findings")
+    st.subheader("คำแนะนำจาก AI")
     
     if uploaded_file and run_btn:
         with st.spinner(f"Consulting {selected_line_name} Expert Module..."):
@@ -162,9 +162,14 @@ with col_right:
                         model = genai.GenerativeModel('gemini-pro')
 
                     prompt = f"""
-                    Role: Senior Process Engineer at NSSUS. Line: {selected_line_name}.
+                    Role: Senior Process Engineer at NS-Siam United Steel. Line: {selected_line_name}.
                     Analyze image for defects: {current_config['Defect_Focus']}.
-                    Response: [STATUS]: (PASS/FAIL), [DEFECT_DETECTED]: ..., [ANALYSIS]: ...
+                    Response: 
+                    * [STATUS]: (PASS/FAIL)
+                    * [DEFECT_DETECTED]: ...(อธิบายว่าเจออะไร), 
+                    * [ANALYSIS]: ...(วิเคราะห์ว่าปัญหาเกิดจากค่าพารามิเตอร์ไหน)
+                    * [NEXT STEP]: ...(ต้องแก้ปัญหาจากอะไร)
+                    ตอบเป็นภาษาไทย
                     """
                     response = model.generate_content([prompt, image])
                     result_text = response.text
@@ -195,7 +200,7 @@ with col_right:
                 save_log(current_time, selected_line_name, lot_number, p1_val, p2_val, p3_val, status, mode_label, "Low")
 
 st.divider()
-st.subheader("📜 History Log")
+st.subheader("History Log")
 if os.path.isfile('production_logs_v2.csv'):
     df = pd.read_csv('production_logs_v2.csv')
     st.dataframe(df.sort_values(by="Timestamp", ascending=False), use_container_width=True)
