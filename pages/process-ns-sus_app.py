@@ -113,16 +113,16 @@ with st.sidebar:
             time.sleep(1)
             st.rerun()
 
-st.title("🏭 NSSUS Smart Claim & Intelligence Center")
+st.title("NSSUS Smart Claim Tracking")
 
 # ปรับ Layout เป็น 4 Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Executive Dashboard", "📝 Submit & Log", "✅ Workflow (MCS)", "🔍 Customer Tracking"])
+tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow", "Customer Tracking"])
 
 df = get_all_data()
 
 # --- TAB 1: EXECUTIVE DASHBOARD (แทน Power BI) ---
 with tab1:
-    st.markdown("### 📈 Real-time Analytics Dashboard")
+    st.markdown("###Real-time Analytics Dashboard")
     st.caption("ข้อมูลวิเคราะห์สถานการณ์เคลมสินค้าแบบ Real-time (ทดแทน Power BI)")
     
     if not df.empty:
@@ -134,10 +134,10 @@ with tab1:
         # คำนวณ % การปิดงาน
         success_rate = (closed / total) * 100 if total > 0 else 0
         
-        col1.metric("📦 Total Claims", total, help="จำนวนเคสทั้งหมด")
-        col2.metric("✅ Resolved", closed, delta=f"{success_rate:.1f}% Rate")
-        col3.metric("⚡ Active Issues", active, delta_color="inverse")
-        col4.metric("⏱️ Avg. Resolution", "2.1 Days") # (Mockup)
+        col1.metric("Total Claims", total, help="จำนวนเคสทั้งหมด")
+        col2.metric("Resolved", closed, delta=f"{success_rate:.1f}% Rate")
+        col3.metric("Active Issues", active, delta_color="inverse")
+        col4.metric("Avg. Resolution", "2.1 Days") # (Mockup)
         
         st.divider()
         
@@ -145,20 +145,20 @@ with tab1:
         c1, c2 = st.columns(2)
         
         with c1:
-            st.subheader("🚧 ปัญหาแยกตามแผนก (Defects by Dept)")
+            st.subheader("ปัญหาแยกตามแผนก (Defects by Dept)")
             if 'Department' in df.columns:
                 dept_counts = df['Department'].value_counts()
                 st.bar_chart(dept_counts, color="#FF4B4B") # สีแดง NSSUS
         
         with c2:
-            st.subheader("📊 สถานะงาน (Work Status)")
+            st.subheader("สถานะงาน (Work Status)")
             if 'Status' in df.columns:
                 # ทำข้อมูลให้เป็นกลุ่มๆ เพื่อกราฟสวย
                 status_counts = df['Status'].value_counts()
                 st.bar_chart(status_counts, color="#29B5E8") # สีฟ้า
                 
         # 3. Business Outcome (ผลประกอบการ)
-        st.subheader("💰 ผลการตัดสินใจ (Business Outcome)")
+        st.subheader("ผลการพิจารณา")
         if 'Final_Decision' in df.columns:
             outcomes = df[df['Final_Decision'] != ""]['Final_Decision'].value_counts()
             if not outcomes.empty:
@@ -181,7 +181,7 @@ with tab2:
             with col_in2:
                 complaint_input = st.text_input("Issue / Complaint", placeholder="Describe the defect...")
             
-            if st.button("🚀 Process & Save", type="primary", use_container_width=True):
+            if st.button("Process & Save", type="primary", use_container_width=True):
                 if lot_input and complaint_input and global_model:
                     with st.spinner("AI Categorizing..."):
                         time.sleep(0.5)
@@ -213,7 +213,7 @@ with tab2:
                 )
 
     st.divider()
-    st.subheader("📜 Operational Log")
+    st.subheader("Operational Log")
     if not df.empty:
         df_display = df.iloc[::-1].copy()
         st.dataframe(
@@ -226,11 +226,11 @@ with tab2:
 
 # --- TAB 3: Workflow ---
 with tab3:
-    st.header("✅ Workflow & Action Center")
-    user_roles = ["QC", "R&D", "Logistics", "Marketing & Customer Service (MCS)"]
+    st.header("Workflow & Action Center")
+    user_roles = ["QC", "R&D", "QA", "Marketing & Customer Service (MCS)"]
     user_dept = st.selectbox("Login As:", user_roles)
     
-    subtab_active, subtab_history = st.tabs(["⚡ Pending Tasks", "📜 Completed History"])
+    subtab_active, subtab_history = st.tabs(["Pending Tasks", "Completed History"])
 
     if not df.empty:
         completed_tasks = df[df['Status'] == 'Case Closed']
@@ -239,7 +239,7 @@ with tab3:
         my_active_tasks = pd.DataFrame()
         if user_dept == "Marketing & Customer Service (MCS)":
             my_active_tasks = active_tasks_all
-            st.success("👑 MCS Mode: Full control active.")
+            st.success("MCS Mode")
         else:
             if 'Current_Handler' in df.columns:
                 my_active_tasks = active_tasks_all[active_tasks_all['Current_Handler'] == user_dept]
