@@ -19,7 +19,7 @@ import pandas as pd
 import datetime
 
 # --- 1. Config & Setup ---
-st.set_page_config(page_title="NSSUS Universal QA", page_icon="🏭", layout="wide")
+st.set_page_config(page_title="NS-SUS Defect Inspection", layout="wide")
 
 # ตั้งค่า API Key (ถ้ามี)
 if "GOOGLE_API_KEY" in st.secrets:
