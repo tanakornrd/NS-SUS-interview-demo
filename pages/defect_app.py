@@ -173,12 +173,13 @@ with col_right:
                     """
                     response = model.generate_content([prompt, image])
                     result_text = response.text
-                    
-                    if "[STATUS]: FAIL" in result_text or "Critical" in result_text:
+                    # ----------------- แก้ไขตรงนี้ -----------------
+                    # เปลี่ยนการเช็กให้ครอบคลุม (เผื่อ AI ตอบ **FAIL** หรือมีเว้นวรรค)
+                    if "FAIL" in result_text.upper():
                         status = "FAIL"
                     else:
                         status = "PASS"
-                        
+                    # -------------------------------------------------------------------
                 except Exception as e:
                     st.error(f"⚠️ Live AI Failed (Quota Exceeded?): {e}")
                     st.info("💡 Tip: เปิด 'Simulation Mode' ที่ Sidebar ด้านซ้ายเพื่อ Demo งานต่อได้เลย")
