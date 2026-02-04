@@ -131,7 +131,7 @@ def load_model():
         return model
     except Exception as e:
         return None
-
+global_model = load_model()
 # ==========================================
 # 3. User Interface
 # ==========================================
