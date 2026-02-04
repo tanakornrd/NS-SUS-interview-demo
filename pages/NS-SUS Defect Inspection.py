@@ -39,23 +39,23 @@ else:
 LINE_CONFIG = {
     "CDCM (Cold Rolling Mill)": {
         "Product": "CR (Cold Rolled Steel)",
-        "Param1": {"name": "Rolling Force", "unit": "MN", "default": 1500, "min": 0, "max": 3000},
-        "Param2": {"name": "Strip Tension", "unit": "kN", "default": 50, "min": 0, "max": 200},
-        "Param3": {"name": "Rolling Speed", "unit": "mpm", "default": 1200, "min": 0, "max": 2000},
+        "Param1": {"name": "Rolling Force (MN)", "unit": "MN", "default": 1500, "min": 0, "max": 3000},
+        "Param2": {"name": "Strip Tension (kN)", "unit": "kN", "default": 50, "min": 0, "max": 200},
+        "Param3": {"name": "Rolling Speed (mpm)", "unit": "mpm", "default": 1200, "min": 0, "max": 2000},
         "Defect_Focus": "Scale, Chatter marks, Edge cracks, Shape defects (Buckle)"
     },
     "CGL (Continuous Galvanizing Line)": {
         "Product": "GA/GI (Galvanized Steel)",
-        "Param1": {"name": "Zinc Pot Temp", "unit": "°C", "default": 460, "min": 400, "max": 500},
-        "Param2": {"name": "Air Knife Pressure", "unit": "kPa", "default": 40, "min": 0, "max": 100},
-        "Param3": {"name": "Line Speed", "unit": "mpm", "default": 180, "min": 0, "max": 300},
+        "Param1": {"name": "Zinc Pot Temp (°C)", "unit": "°C", "default": 460, "min": 400, "max": 500},
+        "Param2": {"name": "Air Knife Pressure (kPa)", "unit": "kPa", "default": 40, "min": 0, "max": 100},
+        "Param3": {"name": "Line Speed (mpm)", "unit": "mpm", "default": 180, "min": 0, "max": 300},
         "Defect_Focus": "Dross, Spangle defects, Uncoated spots, Zinc adhesion issues"
     },
     "EPL (Electrolytic Plating Line)": {
         "Product": "TP/TFS (Tinplate/Tin Free)",
-        "Param1": {"name": "Current Density", "unit": "A/dm²", "default": 20, "min": 0, "max": 100},
-        "Param2": {"name": "Plating Solution Temp", "unit": "°C", "default": 50, "min": 20, "max": 80},
-        "Param3": {"name": "Line Speed", "unit": "mpm", "default": 400, "min": 0, "max": 800},
+        "Param1": {"name": "Current Density (A/dm²)", "unit": "A/dm²", "default": 20, "min": 0, "max": 100},
+        "Param2": {"name": "Plating Solution Temp (°C)", "unit": "°C", "default": 50, "min": 20, "max": 80},
+        "Param3": {"name": "Line Speed (mpm)", "unit": "mpm", "default": 400, "min": 0, "max": 800},
         "Defect_Focus": "Pinholes, Plating burns, Rust, Scratch (from Anode)"
     }
 }
