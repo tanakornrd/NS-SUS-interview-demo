@@ -34,7 +34,7 @@ if use_simulation:
     force_fail = st.sidebar.checkbox("⚠️ Force Defect (สั่งให้เจอของเสีย)", value=False)
 else:
     st.sidebar.warning("LIVE AI MODE: ระบบจะเรียกใช้ Google Gemini จริง (ระวัง Quota)")
-    
+# === ส่วนที่เพิ่ม: ปุ่ม Reset Database ===
 st.sidebar.divider()
 st.sidebar.markdown("### 🗑️ Database Management")
 if st.sidebar.button("ล้างประวัติการตรวจ (Reset Logs)", type="primary", use_container_width=True):
@@ -42,14 +42,14 @@ if st.sidebar.button("ล้างประวัติการตรวจ (Re
     if os.path.exists(log_file):
         try:
             os.remove(log_file)
-            st.toast("🧹 History Log Cleared!", icon="✅") # แจ้งเตือนแบบ Toast สวยๆ
+            st.toast("History Log Cleared!", icon="✅") # แจ้งเตือนแบบ Toast สวยๆ
             time.sleep(1)
             st.rerun()
         except Exception as e:
             st.sidebar.error(f"Error: {e}")
     else:
         st.sidebar.info("Log file is already empty.")
-
+        
 # --- 3. LOGIC & DATA (Updated based on NSSUS.pdf) ---
 LINE_CONFIG = {
     "CDCM (Continuous Descaling & Cold Rolling)": { 
