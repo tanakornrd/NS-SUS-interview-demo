@@ -25,6 +25,7 @@ def init_db():
         if missing_cols:
             for col in missing_cols: df[col] = ""
         
+        # Auto-Fix: ถ้ามีงานค้างที่ System ให้โยนกลับเข้าแผนก
         if 'Current_Handler' in df.columns and 'Department' in df.columns:
             mask = (df['Current_Handler'] == "System") | (df['Current_Handler'].isnull())
             if mask.any():
@@ -41,7 +42,7 @@ def save_to_db(lot_id, complaint, dept, status, days):
         'Status': [status],
         'Estimated_Days': [days],
         'Current_Handler': [dept], 
-        'Action_History': [f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Case Created -> Assigned to {dept}"],
+        'Action_History': [f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Case Created -> AI Assigned to {dept}"],
         'Final_Decision': [""],
         'Resolution_Note': [""]
     })
@@ -52,11 +53,15 @@ def update_status(lot_id, new_status, action_note, next_handler=None, final_deci
     df = pd.read_csv(DB_FILE)
     idx = df[df['Lot_ID'].astype(str) == str(lot_id)].index
     if not idx.empty:
+        # === LOGIC: MASTER CONTROL (MCS Override) ===
         if force_handler:
+            # เปลี่ยนคนถือบอล (Handler)
             df.loc[idx, 'Current_Handler'] = force_handler
-            if "Case Closed" not in new_status: 
-                 df.loc[idx, 'Department'] = force_handler
-            action_note += f" (Management re-assigned to {force_handler})"
+            # เปลี่ยนแผนกเจ้าของเรื่อง (Department) ด้วย เพราะถือว่า AI ผิด
+            df.loc[idx, 'Department'] = force_handler 
+            # เปลี่ยน Status
+            new_status = f"Re-assigned to {force_handler}"
+            action_note += f" (⚠️ MCS Manual Override: Correcting Department)"
 
         df.loc[idx, 'Status'] = new_status
         history = df.loc[idx, 'Action_History'].values[0]
@@ -78,52 +83,43 @@ def get_all_data():
 init_db()
 
 # ==========================================
-# 2. ส่วนสมอง AI
-# ==========================================
-@st.cache_resource
-# ==========================================
-# 2. ส่วนสมอง AI (อัปเดต Data ใหม่: QC, QA, MCS)
+# 2. ส่วนสมอง AI (Force Update: QC, QA, MCS)
 # ==========================================
 @st.cache_resource
 def load_model():
     try:
-        # ลบไฟล์เก่าทิ้งก่อนเพื่อให้สร้างใหม่ (Optional: ถ้าอยากให้ชัวร์ว่าอัปเดต)
-        # if os.path.exists('complaints_data.csv'):
-        #     os.remove('complaints_data.csv')
-
-        if not os.path.exists('complaints_data.csv'):
-            data = {
-                'text': [
-                    # === QC: ปัญหาที่ตัวสินค้า (Product Defects) ===
-                    'สนิมขึ้นที่ขอบเหล็ก', 'สินค้าบุบ', 'ขนาดความหนาไม่ได้ตามสเปค', 
-                    'ผิวเหล็กเป็นรอยขีดข่วน', 'ความแข็งไม่ได้มาตรฐาน', 'สีเคลือบหลุดร่อน',
-                    'มีคราบน้ำมันเยอะเกินไป', 'เหล็กยืดตัวไม่ได้', 'ขอบเหล็กคมเกินไป',
-                    'ค่า Yield Strength ต่ำ', 'Defect ที่ผิว', 'รอยกดทับ',
-                    
-                    # === QA: ปัญหาที่เอกสาร/ระบบ (Documentation/System) ===
-                    'ใบ COA ไม่ตรงกับสินค้า', 'เอกสารรับรองคุณภาพผิด', 'หาใบเซอร์ไม่เจอ',
-                    'ระบุเกรดเหล็กในใบส่งของผิด', 'ไม่ผ่านมาตรฐาน ISO', 'ตรวจสอบย้อนกลับไม่ได้',
-                    'สเปคในระบบไม่ตรงกับป้าย', 'เอกสารประกอบการเคลมไม่ครบ', 'Label ผิด',
-                    
-                    # === MCS: ปัญหาการบริการ/ขนส่ง (Service/Logistics) ===
-                    'ส่งของล่าช้ากว่ากำหนด', 'ติดต่อฝ่ายขายไม่ได้', 'พนักงานขับรถพูดจาไม่สุภาพ',
-                    'ส่งสินค้าผิดสถานที่', 'แพ็คเกจจิ้งเสียหายจากการขนส่ง', 'ขอใบเสนอราคาช้า',
-                    'ประสานงานยอดแย่', 'รถขนส่งมาไม่ตรงเวลา', 'แจ้งสถานะสินค้าผิด',
-                    'ค่าขนส่งแพงเกินไป', 'บริการหลังการขายไม่ดี'
-                ],
-                'department': [
-                    # Mapping ให้ตรงกับจำนวนข้อมูลข้างบน
-                    'QC', 'QC', 'QC', 'QC', 'QC', 'QC',
-                    'QC', 'QC', 'QC', 'QC', 'QC', 'QC',
-                    
-                    'QA', 'QA', 'QA', 'QA', 'QA', 'QA',
-                    'QA', 'QA', 'QA',
-                    
-                    'MCS', 'MCS', 'MCS', 'MCS', 'MCS', 'MCS',
-                    'MCS', 'MCS', 'MCS', 'MCS', 'MCS'
-                ]
-            }
-            pd.DataFrame(data).to_csv('complaints_data.csv', index=False)
+        # เขียนไฟล์ Data ทับเสมอ เพื่อล้าง R&D เก่าออกให้หมด
+        data = {
+            'text': [
+                # === QC: สินค้า ===
+                'สนิมขึ้นที่ขอบเหล็ก', 'สินค้าบุบ', 'ขนาดความหนาไม่ได้ตามสเปค', 
+                'ผิวเหล็กเป็นรอยขีดข่วน', 'ความแข็งไม่ได้มาตรฐาน', 'สีเคลือบหลุดร่อน',
+                'มีคราบน้ำมันเยอะเกินไป', 'เหล็กยืดตัวไม่ได้', 'ขอบเหล็กคมเกินไป',
+                'ค่า Yield Strength ต่ำ', 'Defect ที่ผิว', 'รอยกดทับ', 'เหล็กแตก',
+                
+                # === QA: เอกสาร ===
+                'ใบ COA ไม่ตรงกับสินค้า', 'เอกสารรับรองคุณภาพผิด', 'หาใบเซอร์ไม่เจอ',
+                'ระบุเกรดเหล็กในใบส่งของผิด', 'ไม่ผ่านมาตรฐาน ISO', 'ตรวจสอบย้อนกลับไม่ได้',
+                'สเปคในระบบไม่ตรงกับป้าย', 'เอกสารประกอบการเคลมไม่ครบ', 'Label ผิด',
+                
+                # === MCS: บริการ ===
+                'ส่งของล่าช้ากว่ากำหนด', 'ติดต่อฝ่ายขายไม่ได้', 'พนักงานขับรถพูดจาไม่สุภาพ',
+                'ส่งสินค้าผิดสถานที่', 'แพ็คเกจจิ้งเสียหายจากการขนส่ง', 'ขอใบเสนอราคาช้า',
+                'ประสานงานยอดแย่', 'รถขนส่งมาไม่ตรงเวลา', 'แจ้งสถานะสินค้าผิด',
+                'ค่าขนส่งแพงเกินไป', 'บริการหลังการขายไม่ดี'
+            ],
+            'department': [
+                'QC', 'QC', 'QC', 'QC', 'QC', 'QC',
+                'QC', 'QC', 'QC', 'QC', 'QC', 'QC', 'QC',
+                
+                'QA', 'QA', 'QA', 'QA', 'QA', 'QA',
+                'QA', 'QA', 'QA',
+                
+                'MCS', 'MCS', 'MCS', 'MCS', 'MCS', 'MCS',
+                'MCS', 'MCS', 'MCS', 'MCS', 'MCS'
+            ]
+        }
+        pd.DataFrame(data).to_csv('complaints_data.csv', index=False)
             
         df = pd.read_csv('complaints_data.csv')
         model = make_pipeline(CountVectorizer(), MultinomialNB())
@@ -131,11 +127,13 @@ def load_model():
         return model
     except Exception as e:
         return None
+
 global_model = load_model()
+
 # ==========================================
 # 3. User Interface
 # ==========================================
-st.set_page_config(page_title="NS-SUS Smart Claim & Tracking", layout="wide")
+st.set_page_config(page_title="NS-SUS Smart Claim", page_icon="🛡️", layout="wide")
 
 with st.sidebar:
     st.title("🔧 Tools")
@@ -147,61 +145,41 @@ with st.sidebar:
             time.sleep(1)
             st.rerun()
 
-st.title("NS-SUS Smart Claim Tracking")
+st.title("🛡️ NS-SUS Smart Claim & Tracking")
 
-# ปรับ Layout เป็น 4 Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow", "Customer Tracking"])
+tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow (Master Control)", "Customer Tracking"])
 
 df = get_all_data()
 
-# --- TAB 1: EXECUTIVE DASHBOARD (แทน Power BI) ---
+# --- TAB 1: EXECUTIVE DASHBOARD ---
 with tab1:
-    st.markdown("Real-time Analytics Dashboard")
+    st.markdown("### Real-time Analytics Dashboard")
     st.caption("ข้อมูลวิเคราะห์สถานการณ์เคลมสินค้าแบบ Real-time")
     
     if not df.empty:
-        # 1. KPI Cards (ตัวเลขสำคัญ)
         col1, col2, col3, col4 = st.columns(4)
         total = len(df)
         closed = len(df[df['Status'] == 'Case Closed'])
         active = total - closed
-        # คำนวณ % การปิดงาน
         success_rate = (closed / total) * 100 if total > 0 else 0
         
-        col1.metric("Total Claims", total, help="จำนวนเคสทั้งหมด")
+        col1.metric("Total Claims", total)
         col2.metric("Resolved", closed, delta=f"{success_rate:.1f}% Rate")
         col3.metric("Active Issues", active, delta_color="inverse")
-        col4.metric("Avg. Resolution", "2.1 Days") # (Mockup)
+        col4.metric("Avg. Resolution", "2.1 Days")
         
         st.divider()
-        
-        # 2. Charts Zone
         c1, c2 = st.columns(2)
-        
         with c1:
-            st.subheader("ปัญหาแยกตามแผนก (Defects by Dept)")
+            st.subheader("Defects by Dept")
             if 'Department' in df.columns:
-                dept_counts = df['Department'].value_counts()
-                st.bar_chart(dept_counts, color="#FF4B4B") # สีแดง NSSUS
-        
+                st.bar_chart(df['Department'].value_counts(), color="#FF4B4B")
         with c2:
-            st.subheader("สถานะงาน (Work Status)")
+            st.subheader("Work Status")
             if 'Status' in df.columns:
-                # ทำข้อมูลให้เป็นกลุ่มๆ เพื่อกราฟสวย
-                status_counts = df['Status'].value_counts()
-                st.bar_chart(status_counts, color="#29B5E8") # สีฟ้า
-                
-        # 3. Business Outcome (ผลประกอบการ)
-        st.subheader("ผลการพิจารณา")
-        if 'Final_Decision' in df.columns:
-            outcomes = df[df['Final_Decision'] != ""]['Final_Decision'].value_counts()
-            if not outcomes.empty:
-                st.bar_chart(outcomes, horizontal=True) # กราฟแนวนอน
-            else:
-                st.info("ยังไม่มีข้อมูลการตัดสินใจปิดเคส (No finalized cases)")
-                
+                st.bar_chart(df['Status'].value_counts(), color="#29B5E8")
     else:
-        st.info("Waiting for data stream... Please submit a case in the next tab.")
+        st.info("Waiting for data stream...")
 
 # --- TAB 2: Submit & Log ---
 with tab2:
@@ -221,9 +199,13 @@ with tab2:
                         time.sleep(0.5)
                         predicted_dept = global_model.predict([complaint_input])[0]
                         status = f"Assigned to {predicted_dept}"
+                        
+                        # Logic กำหนดวันแบบใหม่ (QC, QA, MCS)
                         days = 3
-                        if predicted_dept == "R&D": days = 7
-                        elif predicted_dept == "Logistics": days = 2
+                        if predicted_dept == "QA": days = 1
+                        elif predicted_dept == "MCS": days = 2
+                        elif predicted_dept == "QC": days = 5
+                        
                         save_to_db(lot_input, complaint_input, predicted_dept, status, days)
                     st.success(f"New case assigned to **{predicted_dept}**")
                     time.sleep(0.5)
@@ -232,11 +214,9 @@ with tab2:
                     st.warning("Please fill in all fields.")
         
         with c2:
-             # ปุ่ม Excel Export
             st.write("### 📥 Export Data")
             if not df.empty:
                 buffer = io.BytesIO()
-                # เปลี่ยนเป็น CSV เพื่อความชัวร์บน Mac (ไม่ต้องลง lib เพิ่ม)
                 csv_data = df.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📄 Download CSV Report",
@@ -250,18 +230,14 @@ with tab2:
     st.subheader("Operational Log")
     if not df.empty:
         df_display = df.iloc[::-1].copy()
-        st.dataframe(
-            df_display[['Lot_ID', 'Date', 'Complaint', 'Department', 'Status', 'Current_Handler']],
-            use_container_width=True,
-            hide_index=True
-        )
+        st.dataframe(df_display[['Lot_ID', 'Date', 'Complaint', 'Department', 'Status', 'Current_Handler']], use_container_width=True, hide_index=True)
     else:
         st.info("No data available.")
 
-# --- TAB 3: Workflow ---
+# --- TAB 3: Workflow (Master Control) ---
 with tab3:
     st.header("Workflow & Action Center")
-    user_roles = ["QC", "QA", "MCS (Marketing & Customer Service)"]
+    user_roles = ["QC", "QA", "MCS"] # เหลือแค่ 3 แผนกตามสั่ง
     user_dept = st.selectbox("Login As:", user_roles)
     
     subtab_active, subtab_history = st.tabs(["Pending Tasks", "Completed History"])
@@ -271,9 +247,11 @@ with tab3:
         active_tasks_all = df[df['Status'] != 'Case Closed']
         
         my_active_tasks = pd.DataFrame()
-        if user_dept == "Marketing & Customer Service (MCS)":
+        
+        # MCS เห็นงานทั้งหมด (God Mode)
+        if user_dept == "MCS":
             my_active_tasks = active_tasks_all
-            st.success("MCS Mode")
+            st.success("🛡️ MCS Master Control Mode Active: You can oversee and override all tasks.")
         else:
             if 'Current_Handler' in df.columns:
                 my_active_tasks = active_tasks_all[active_tasks_all['Current_Handler'] == user_dept]
@@ -286,35 +264,51 @@ with tab3:
                         with c1:
                             st.markdown(f"#### 📌 {row['Lot_ID']}")
                             st.markdown(f"**Issue:** {row['Complaint']}")
+                            # ไฮไลท์ให้เห็นชัดๆ ว่างานอยู่ที่ใคร
                             st.info(f"**Current Handler:** {row['Current_Handler']}") 
                             with st.expander("History Log"):
                                 if pd.notna(row['Action_History']):
                                     for h in str(row['Action_History']).split(' || '):
                                         st.caption(f"• {h}")
+
                         with c2:
                             st.write("### Action")
-                            if user_dept == "Marketing & Customer Service (MCS)":
-                                if row['Current_Handler'] == "Marketing & Customer Service (MCS)":
+                            
+                            # === MCS ZONE: MASTER CONTROL ===
+                            if user_dept == "MCS":
+                                # 1. ถ้างานอยู่ที่ MCS -> ตัดสินใจปิดงานได้เลย
+                                if row['Current_Handler'] == "MCS":
                                     st.markdown("##### ⚖️ Final Decision")
-                                    decision = st.selectbox("Decision", ["Approve", "Compromise", "Reject"], key=f"d_{row['Lot_ID']}")
+                                    decision = st.selectbox("Outcome", ["Approve", "Compromise", "Reject"], key=f"d_{row['Lot_ID']}")
                                     note = st.text_input("Note to Customer", key=f"n_{row['Lot_ID']}")
                                     if st.button("🏁 Close Case", key=f"btn_{row['Lot_ID']}", type="primary"):
                                         update_status(row['Lot_ID'], "Case Closed", f"MCS: {decision}", "Completed", decision, note)
                                         st.rerun()
+                                
+                                # 2. MASTER CONTROL: ย้ายงานได้ทุกกรณี (Human-in-the-loop)
                                 st.markdown("---")
-                                st.caption("🛠️ **Override**")
-                                new_handler = st.selectbox("Re-assign to:", ["QC", "R&D", "Logistics", "Marketing & Customer Service (MCS)"], key=f"move_{row['Lot_ID']}")
-                                if st.button("Force Move", key=f"btn_move_{row['Lot_ID']}"):
-                                    update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS moved case", force_handler=new_handler)
-                                    st.success(f"Moved to {new_handler}")
+                                st.markdown("##### 🛡️ Master Control (Human Override)")
+                                st.caption("Use this if AI assigned the wrong department.")
+                                
+                                # Dropdown เลือกแผนกที่จะย้ายไป (ไม่เอา System)
+                                target_depts = ["QC", "QA", "MCS"]
+                                new_handler = st.selectbox("Re-assign to:", target_depts, key=f"move_{row['Lot_ID']}")
+                                
+                                if st.button("⚠️ Force Re-assign", key=f"btn_move_{row['Lot_ID']}"):
+                                    # เรียกใช้ฟังก์ชัน update_status แบบ force
+                                    update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS Master Override", force_handler=new_handler)
+                                    st.success(f"Corrected assignment to {new_handler}")
                                     st.rerun()
+
+                            # === QC/QA ZONE ===
                             else: 
                                 note = st.text_input("Investigation Note", key=f"in_{row['Lot_ID']}")
                                 if st.button("➡️ Forward to MCS", key=f"fwd_{row['Lot_ID']}"):
-                                    update_status(row['Lot_ID'], "Investigation Complete", f"{user_dept}: {note}", "Marketing & Customer Service (MCS)")
+                                    update_status(row['Lot_ID'], "Investigation Complete", f"{user_dept}: {note}", "MCS")
                                     st.rerun()
             else:
                 st.success(f"🎉 No pending tasks for **{user_dept}**")
+        
         with subtab_history:
             st.dataframe(completed_tasks, use_container_width=True)
 
