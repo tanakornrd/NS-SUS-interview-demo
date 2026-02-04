@@ -141,13 +141,13 @@ with st.sidebar:
         if os.path.exists(DB_FILE):
             os.remove(DB_FILE)
             init_db()
-            st.success("Database Cleared! 🧹")
+            st.success("Database Cleared!")
             time.sleep(1)
             st.rerun()
 
 st.title("NS-SUS Smart Claim & Tracking")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow (Master Control)", "Customer Tracking"])
+tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow & Action Center", "Customer Tracking"])
 
 df = get_all_data()
 
@@ -202,8 +202,8 @@ with tab2:
                         
                         # Logic กำหนดวันแบบใหม่ (QC, QA, MCS)
                         days = 3
-                        if predicted_dept == "QA": days = 1
-                        elif predicted_dept == "MCS": days = 2
+                        if predicted_dept == "QA": days = 5
+                        elif predicted_dept == "MCS": days = 5
                         elif predicted_dept == "QC": days = 5
                         
                         save_to_db(lot_input, complaint_input, predicted_dept, status, days)
@@ -281,24 +281,23 @@ with tab3:
                             # === MCS ZONE: MASTER CONTROL ===
                             if user_dept == "MCS":
                                 if row['Current_Handler'] == "MCS":
-                                    st.markdown("##### ⚖️ Final Decision")
+                                    st.markdown("##### Final Decision")
                                     # แก้ key ตรงนี้
                                     decision = st.selectbox("Outcome", ["Approve", "Compromise", "Reject"], key=f"d{unique_suffix}")
                                     note = st.text_input("Note to Customer", key=f"n{unique_suffix}")
                                     
-                                    if st.button("🏁 Close Case", key=f"btn{unique_suffix}", type="primary"):
+                                    if st.button("Close Case", key=f"btn{unique_suffix}", type="primary"):
                                         update_status(row['Lot_ID'], "Case Closed", f"MCS: {decision}", "Completed", decision, note)
                                         st.rerun()
                                 
                                 st.markdown("---")
-                                st.markdown("##### 🛡️ Master Control")
+                                st.markdown("##### MCS Manual Control Override")
                                 
-                                # แก้ key ตรงนี้ (ที่เป็นตัวต้นเหตุ Error)
                                 target_depts = ["QC", "QA", "MCS"]
                                 new_handler = st.selectbox("Re-assign to:", target_depts, key=f"move{unique_suffix}")
                                 
                                 if st.button("⚠️ Force Re-assign", key=f"btn_move{unique_suffix}"):
-                                    update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS Master Override", force_handler=new_handler)
+                                    update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS Manual Control Override", force_handler=new_handler)
                                     st.success(f"Corrected assignment to {new_handler}")
                                     st.rerun()
 
