@@ -81,22 +81,56 @@ init_db()
 # 2. ส่วนสมอง AI
 # ==========================================
 @st.cache_resource
+# ==========================================
+# 2. ส่วนสมอง AI (อัปเดต Data ใหม่: QC, QA, MCS)
+# ==========================================
+@st.cache_resource
 def load_model():
     try:
+        # ลบไฟล์เก่าทิ้งก่อนเพื่อให้สร้างใหม่ (Optional: ถ้าอยากให้ชัวร์ว่าอัปเดต)
+        # if os.path.exists('complaints_data.csv'):
+        #     os.remove('complaints_data.csv')
+
         if not os.path.exists('complaints_data.csv'):
             data = {
-                'text': ['สนิมขึ้น', 'ขนาดไม่ได้', 'ส่งช้า', 'สินค้าบุบ', 'สีเพี้ยน', 'ความแข็งไม่ได้มาตรฐาน', 'ขนส่งทำของเสียหาย'],
-                'department': ['QC', 'QC', 'Logistics', 'Logistics', 'QC', 'R&D', 'Logistics']
+                'text': [
+                    # === QC: ปัญหาที่ตัวสินค้า (Product Defects) ===
+                    'สนิมขึ้นที่ขอบเหล็ก', 'สินค้าบุบ', 'ขนาดความหนาไม่ได้ตามสเปค', 
+                    'ผิวเหล็กเป็นรอยขีดข่วน', 'ความแข็งไม่ได้มาตรฐาน', 'สีเคลือบหลุดร่อน',
+                    'มีคราบน้ำมันเยอะเกินไป', 'เหล็กยืดตัวไม่ได้', 'ขอบเหล็กคมเกินไป',
+                    'ค่า Yield Strength ต่ำ', 'Defect ที่ผิว', 'รอยกดทับ',
+                    
+                    # === QA: ปัญหาที่เอกสาร/ระบบ (Documentation/System) ===
+                    'ใบ COA ไม่ตรงกับสินค้า', 'เอกสารรับรองคุณภาพผิด', 'หาใบเซอร์ไม่เจอ',
+                    'ระบุเกรดเหล็กในใบส่งของผิด', 'ไม่ผ่านมาตรฐาน ISO', 'ตรวจสอบย้อนกลับไม่ได้',
+                    'สเปคในระบบไม่ตรงกับป้าย', 'เอกสารประกอบการเคลมไม่ครบ', 'Label ผิด',
+                    
+                    # === MCS: ปัญหาการบริการ/ขนส่ง (Service/Logistics) ===
+                    'ส่งของล่าช้ากว่ากำหนด', 'ติดต่อฝ่ายขายไม่ได้', 'พนักงานขับรถพูดจาไม่สุภาพ',
+                    'ส่งสินค้าผิดสถานที่', 'แพ็คเกจจิ้งเสียหายจากการขนส่ง', 'ขอใบเสนอราคาช้า',
+                    'ประสานงานยอดแย่', 'รถขนส่งมาไม่ตรงเวลา', 'แจ้งสถานะสินค้าผิด',
+                    'ค่าขนส่งแพงเกินไป', 'บริการหลังการขายไม่ดี'
+                ],
+                'department': [
+                    # Mapping ให้ตรงกับจำนวนข้อมูลข้างบน
+                    'QC', 'QC', 'QC', 'QC', 'QC', 'QC',
+                    'QC', 'QC', 'QC', 'QC', 'QC', 'QC',
+                    
+                    'QA', 'QA', 'QA', 'QA', 'QA', 'QA',
+                    'QA', 'QA', 'QA',
+                    
+                    'MCS', 'MCS', 'MCS', 'MCS', 'MCS', 'MCS',
+                    'MCS', 'MCS', 'MCS', 'MCS', 'MCS'
+                ]
             }
             pd.DataFrame(data).to_csv('complaints_data.csv', index=False)
+            
         df = pd.read_csv('complaints_data.csv')
         model = make_pipeline(CountVectorizer(), MultinomialNB())
         model.fit(df['text'], df['department'])
         return model
     except Exception as e:
         return None
-
-global_model = load_model()
 
 # ==========================================
 # 3. User Interface
@@ -227,7 +261,7 @@ with tab2:
 # --- TAB 3: Workflow ---
 with tab3:
     st.header("Workflow & Action Center")
-    user_roles = ["QC", "R&D", "QA", "Marketing & Customer Service (MCS)"]
+    user_roles = ["QC", "QA", "MCS (Marketing & Customer Service)"]
     user_dept = st.selectbox("Login As:", user_roles)
     
     subtab_active, subtab_history = st.tabs(["Pending Tasks", "Completed History"])
