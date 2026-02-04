@@ -173,7 +173,7 @@ with st.sidebar:
 
 st.title("NS-SUS Smart Claim & Tracking")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow (Master Control)", "Customer Tracking"])
+tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow & Action Center", "Customer Tracking"])
 
 df = get_all_data()
 
