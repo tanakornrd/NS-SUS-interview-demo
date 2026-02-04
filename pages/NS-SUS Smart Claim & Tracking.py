@@ -259,12 +259,16 @@ with tab3:
         with subtab_active:
             if not my_active_tasks.empty:
                 for index, row in my_active_tasks.iterrows():
+                    # ---------------------------------------------------------
+                    # 💡 ทริค: เติม _{index} ต่อท้าย key ทุกอัน เพื่อกัน ID ซ้ำแล้วแอปแตก
+                    # ---------------------------------------------------------
+                    unique_suffix = f"_{row['Lot_ID']}_{index}" 
+
                     with st.container(border=True):
                         c1, c2 = st.columns([1.5, 1])
                         with c1:
                             st.markdown(f"#### 📌 {row['Lot_ID']}")
                             st.markdown(f"**Issue:** {row['Complaint']}")
-                            # ไฮไลท์ให้เห็นชัดๆ ว่างานอยู่ที่ใคร
                             st.info(f"**Current Handler:** {row['Current_Handler']}") 
                             with st.expander("History Log"):
                                 if pd.notna(row['Action_History']):
@@ -276,39 +280,37 @@ with tab3:
                             
                             # === MCS ZONE: MASTER CONTROL ===
                             if user_dept == "MCS":
-                                # 1. ถ้างานอยู่ที่ MCS -> ตัดสินใจปิดงานได้เลย
                                 if row['Current_Handler'] == "MCS":
-                                    st.markdown("##### Final Decision")
-                                    decision = st.selectbox("Outcome", ["Approve", "Compromise", "Reject"], key=f"d_{row['Lot_ID']}")
-                                    note = st.text_input("Note to Customer", key=f"n_{row['Lot_ID']}")
-                                    if st.button("🏁 Close Case", key=f"btn_{row['Lot_ID']}", type="primary"):
+                                    st.markdown("##### ⚖️ Final Decision")
+                                    # แก้ key ตรงนี้
+                                    decision = st.selectbox("Outcome", ["Approve", "Compromise", "Reject"], key=f"d{unique_suffix}")
+                                    note = st.text_input("Note to Customer", key=f"n{unique_suffix}")
+                                    
+                                    if st.button("🏁 Close Case", key=f"btn{unique_suffix}", type="primary"):
                                         update_status(row['Lot_ID'], "Case Closed", f"MCS: {decision}", "Completed", decision, note)
                                         st.rerun()
                                 
-                                # 2. MASTER CONTROL: ย้ายงานได้ทุกกรณี (Human-in-the-loop)
                                 st.markdown("---")
-                                st.markdown("##### Manual Control")
-                                st.caption("Use this if AI assigned the wrong department.")
+                                st.markdown("##### 🛡️ Master Control")
                                 
-                                # Dropdown เลือกแผนกที่จะย้ายไป (ไม่เอา System)
+                                # แก้ key ตรงนี้ (ที่เป็นตัวต้นเหตุ Error)
                                 target_depts = ["QC", "QA", "MCS"]
-                                new_handler = st.selectbox("Re-assign to:", target_depts, key=f"move_{row['Lot_ID']}")
+                                new_handler = st.selectbox("Re-assign to:", target_depts, key=f"move{unique_suffix}")
                                 
-                                if st.button("⚠️ Force Re-assign", key=f"btn_move_{row['Lot_ID']}"):
-                                    # เรียกใช้ฟังก์ชัน update_status แบบ force
+                                if st.button("⚠️ Force Re-assign", key=f"btn_move{unique_suffix}"):
                                     update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS Master Override", force_handler=new_handler)
                                     st.success(f"Corrected assignment to {new_handler}")
                                     st.rerun()
 
                             # === QC/QA ZONE ===
                             else: 
-                                note = st.text_input("Investigation Note", key=f"in_{row['Lot_ID']}")
-                                if st.button("➡️ Forward to MCS", key=f"fwd_{row['Lot_ID']}"):
+                                # แก้ key ตรงนี้ด้วย
+                                note = st.text_input("Investigation Note", key=f"in{unique_suffix}")
+                                if st.button("➡️ Forward to MCS", key=f"fwd{unique_suffix}"):
                                     update_status(row['Lot_ID'], "Investigation Complete", f"{user_dept}: {note}", "MCS")
                                     st.rerun()
             else:
                 st.success(f"🎉 No pending tasks for **{user_dept}**")
-        
         with subtab_history:
             st.dataframe(completed_tasks, use_container_width=True)
 
