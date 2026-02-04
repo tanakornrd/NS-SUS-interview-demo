@@ -36,8 +36,8 @@ else:
     st.sidebar.warning("LIVE AI MODE: ระบบจะเรียกใช้ Google Gemini จริง (ระวัง Quota)")
 # === ส่วนที่เพิ่ม: ปุ่ม Reset Database ===
 st.sidebar.divider()
-st.sidebar.markdown("### 🗑️ Database Management")
-if st.sidebar.button("ล้างประวัติการตรวจ (Reset Logs)", type="primary", use_container_width=True):
+st.sidebar.markdown("### Database Management")
+if st.sidebar.button("ล้างประวัติการตรวจ (Reset)", type="primary", use_container_width=True):
     log_file = 'production_logs_v2.csv'
     if os.path.exists(log_file):
         try:
