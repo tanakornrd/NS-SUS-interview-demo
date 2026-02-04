@@ -27,13 +27,13 @@ if "GOOGLE_API_KEY" in st.secrets:
 
 # --- 2. SIDEBAR CONFIG (แผงควบคุมลับสำหรับคน Demo) ---
 st.sidebar.title("🔧 Developer Settings")
-use_simulation = st.sidebar.toggle("🎭 Simulation Mode (For Demo)", value=True, help="เปิดโหมดนี้เพื่อจำลองผลลัพธ์โดยไม่ใช้ Quota Google")
+use_simulation = st.sidebar.toggle("Simulation Mode (For Demo)", value=True, help="เปิดโหมดนี้เพื่อจำลองผลลัพธ์โดยไม่ใช้ Quota Google")
 
 if use_simulation:
     st.sidebar.success("✅ SIMULATION ACTIVE: ระบบจะจำลองคำตอบเสมือนจริง (ไม่กิน Quota)")
     force_fail = st.sidebar.checkbox("⚠️ Force Defect (สั่งให้เจอของเสีย)", value=False)
 else:
-    st.sidebar.warning("📡 LIVE AI MODE: ระบบจะเรียกใช้ Google Gemini จริง (ระวัง Quota)")
+    st.sidebar.warning("LIVE AI MODE: ระบบจะเรียกใช้ Google Gemini จริง (ระวัง Quota)")
 
 # --- 3. LOGIC & DATA (Updated based on NSSUS.pdf) ---
 LINE_CONFIG = {
@@ -110,7 +110,7 @@ st.markdown("---")
 col_visual, col_control = st.columns([2, 1]) 
 
 with col_control:
-    st.subheader("⚙️ Controls")
+    st.subheader("Controls")
     uploaded_file = st.file_uploader(f"Upload Image (CCTV)", type=["jpg", "png", "jpeg"])
     
     run_btn = False
@@ -121,7 +121,7 @@ with col_control:
         run_btn = st.button("🚀 Run Expert Analysis", type="primary", use_container_width=True)
 
 with col_visual:
-    st.subheader("👁️ Visual Inspection Monitor")
+    st.subheader("Visual Inspection Monitor (แทนภาพจากกล้องวงจรปิดที่ตรวจสอบสินค้าในไลน์ผลิต)")
     if uploaded_file:
         image = Image.open(uploaded_file)
         # แสดงรูปเต็มความกว้างคอลัมน์
@@ -140,7 +140,7 @@ with col_visual:
 # === ZONE 3: AI RESULT (ย้ายมาไว้ข้างล่าง เต็มจอ) ===
 if uploaded_file and run_btn:
     st.divider()
-    st.subheader("🤖 AI Expert Analysis Result")
+    st.subheader("Analysis Result")
     
     with st.spinner(f"Consulting {selected_line_name} Expert Module..."):
         
@@ -197,7 +197,8 @@ if uploaded_file and run_btn:
                 Role: Senior Process Engineer at NS-Siam United Steel, เป็นนักคำนวณที่คุ้มค่าที่สุดในโลก และเป็นผู้วางแผนการบริหารการจัดการ production line ที่คุ้มค่าที่สุดในโลก. Line: {selected_line_name}.
                 Analyze image for defects: {current_config['Defect_Focus']}.
                 Response format:
-                * [STATUS]: (PASS/FAIL)
+                
+                * [STATUS]: ตอบแค่คำว่า "PASS" หรือ "FAIL"
                 * [DEFECT_DETECTED]: ...(ตรวจพบอะไร กระชับคำตอบใน 1-2 ประโยค)
                 * [ANALYSIS]: ...(วิเคราะห์ว่า defect เป็นผลมาจากอะไร parameter ไหนมีผลต่อ defect กระชับคำตอบใน 1-2 ประโยค)
                 * [NEXT STEP]: ...(ต้องทำอะไรต่อ ต้องปรับค่า parameter ไหน หรือทำยังไงเพื่อแก้ไขโดยส่งผลกระทบต่อกระบวนการน้อยที่สุด ลดต้นทุนทางเศรษฐศาสตร์ คำนวณความคุ้มค่าเชิงการดำเนินงาน, เศรษฐ์ศาสตร์, ทางแก้ทางวิศวกรรม กระชับคำตอบใน 1-3 ประโยค)
