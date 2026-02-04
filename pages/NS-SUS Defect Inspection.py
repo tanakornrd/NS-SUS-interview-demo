@@ -87,19 +87,19 @@ with st.container(border=True):
     c1, c2, c3, c4 = st.columns(4, vertical_alignment="bottom")
     
     with c1:
-        st.markdown("**Lot Number**")
+        st.markup("**Lot Number**")
         lot_number = st.text_input("Lot No.", value="LOT-2026-X001", label_visibility="collapsed")
     with c2:
         p1_cfg = current_config['Param1']
-        st.markdown(f"**{p1_cfg['name']}**")
+        st.markup(f"**{p1_cfg['name']}**")
         p1_val = st.number_input("P1", value=p1_cfg['default'], label_visibility="collapsed")
     with c3:
         p2_cfg = current_config['Param2']
-        st.markdown(f"**{p2_cfg['name']}**")
+        st.markup(f"**{p2_cfg['name']}**")
         p2_val = st.number_input("P2", value=p2_cfg['default'], label_visibility="collapsed")
     with c4:
         p3_cfg = current_config['Param3']
-        st.markdown(f"**{p3_cfg['name']}**")
+        st.markup(f"**{p3_cfg['name']}**")
         p3_val = st.number_input("P3", value=p3_cfg['default'], label_visibility="collapsed")
 
 st.markdown("---")
@@ -118,7 +118,7 @@ with col_control:
         st.success("Image Loaded!")
         st.markdown("Ready to analyze...")
         # ปุ่มกดรัน ย้ายมาอยู่ตรงนี้ กดง่ายๆ
-        run_btn = st.button("🚀 Run Expert Analysis", type="primary", use_container_width=True)
+        run_btn = st.button("Run Analysis", type="primary", use_container_width=True)
 
 with col_visual:
     st.subheader("Visual Inspection Monitor (แทนภาพจากกล้องวงจรปิดที่ตรวจสอบสินค้าในไลน์ผลิต)")
@@ -196,9 +196,7 @@ if uploaded_file and run_btn:
                 prompt = f"""
                 Role: Senior Process Engineer at NS-Siam United Steel, เป็นนักคำนวณที่คุ้มค่าที่สุดในโลก และเป็นผู้วางแผนการบริหารการจัดการ production line ที่คุ้มค่าที่สุดในโลก. Line: {selected_line_name}.
                 Analyze image for defects: {current_config['Defect_Focus']}.
-                Response format:
-                
-                * [STATUS]: ตอบแค่คำว่า "PASS" หรือ "FAIL"
+                Response format: [STATUS]: ตอบแค่คำว่า "PASS" หรือ "FAIL"
                 * [DEFECT_DETECTED]: ...(ตรวจพบอะไร กระชับคำตอบใน 1-2 ประโยค)
                 * [ANALYSIS]: ...(วิเคราะห์ว่า defect เป็นผลมาจากอะไร parameter ไหนมีผลต่อ defect กระชับคำตอบใน 1-2 ประโยค)
                 * [NEXT STEP]: ...(ต้องทำอะไรต่อ ต้องปรับค่า parameter ไหน หรือทำยังไงเพื่อแก้ไขโดยส่งผลกระทบต่อกระบวนการน้อยที่สุด ลดต้นทุนทางเศรษฐศาสตร์ คำนวณความคุ้มค่าเชิงการดำเนินงาน, เศรษฐ์ศาสตร์, ทางแก้ทางวิศวกรรม กระชับคำตอบใน 1-3 ประโยค)
