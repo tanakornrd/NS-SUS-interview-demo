@@ -133,7 +133,7 @@ global_model = load_model()
 # ==========================================
 # 3. User Interface
 # ==========================================
-st.set_page_config(page_title="NS-SUS Smart Claim", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="NS-SUS Smart Claim", layout="wide")
 
 with st.sidebar:
     st.title("🔧 Tools")
@@ -145,7 +145,7 @@ with st.sidebar:
             time.sleep(1)
             st.rerun()
 
-st.title("🛡️ NS-SUS Smart Claim & Tracking")
+st.title("NS-SUS Smart Claim & Tracking")
 
 tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow (Master Control)", "Customer Tracking"])
 
@@ -248,10 +248,10 @@ with tab3:
         
         my_active_tasks = pd.DataFrame()
         
-        # MCS เห็นงานทั้งหมด (God Mode)
+        # MCS เห็นงานทั้งหมด
         if user_dept == "MCS":
             my_active_tasks = active_tasks_all
-            st.success("🛡️ MCS Master Control Mode Active: You can oversee and override all tasks.")
+            st.success("MCS Mode Active: You can oversee and override wrong tasks.")
         else:
             if 'Current_Handler' in df.columns:
                 my_active_tasks = active_tasks_all[active_tasks_all['Current_Handler'] == user_dept]
@@ -278,7 +278,7 @@ with tab3:
                             if user_dept == "MCS":
                                 # 1. ถ้างานอยู่ที่ MCS -> ตัดสินใจปิดงานได้เลย
                                 if row['Current_Handler'] == "MCS":
-                                    st.markdown("##### ⚖️ Final Decision")
+                                    st.markdown("##### Final Decision")
                                     decision = st.selectbox("Outcome", ["Approve", "Compromise", "Reject"], key=f"d_{row['Lot_ID']}")
                                     note = st.text_input("Note to Customer", key=f"n_{row['Lot_ID']}")
                                     if st.button("🏁 Close Case", key=f"btn_{row['Lot_ID']}", type="primary"):
@@ -287,7 +287,7 @@ with tab3:
                                 
                                 # 2. MASTER CONTROL: ย้ายงานได้ทุกกรณี (Human-in-the-loop)
                                 st.markdown("---")
-                                st.markdown("##### 🛡️ Master Control (Human Override)")
+                                st.markdown("##### Manual Control")
                                 st.caption("Use this if AI assigned the wrong department.")
                                 
                                 # Dropdown เลือกแผนกที่จะย้ายไป (ไม่เอา System)
