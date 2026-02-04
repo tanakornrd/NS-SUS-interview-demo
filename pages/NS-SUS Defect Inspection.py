@@ -71,6 +71,7 @@ def save_log(timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defec
         writer.writerow([timestamp, line_name, lot_id, p1_val, p2_val, p3_val, status, defect_type, risk_level])
 
 # --- 4. UI Layout ---
+# --- 4. UI Layout (ปรับปรุงใหม่: จัดระเบียบ UI) ---
 st.title("NS-SUS Defect Inspection")
 st.markdown("---")
 
@@ -78,10 +79,13 @@ st.subheader("Select Production Line")
 selected_line_name = st.selectbox("Choose Process Unit:", list(LINE_CONFIG.keys()))
 current_config = LINE_CONFIG[selected_line_name]
 
-st.markdown(f"**active Module:** `{current_config['Product']}`")
+st.info(f"📍 **Active Module:** `{current_config['Product']}`")
 
+# === ZONE 1: PARAMETERS (จัดให้ชิดขอบล่างเท่ากัน) ===
 with st.container(border=True):
-    c1, c2, c3, c4 = st.columns(4)
+    # ใช้ vertical_alignment="bottom" เพื่อให้ Input ทุกช่องวางระนาบเดียวกันเป๊ะ
+    c1, c2, c3, c4 = st.columns(4, vertical_alignment="bottom")
+    
     with c1:
         st.markdown("**Lot Number**")
         lot_number = st.text_input("Lot No.", value="LOT-2026-X001", label_visibility="collapsed")
@@ -100,106 +104,135 @@ with st.container(border=True):
 
 st.markdown("---")
 
-col_left, col_right = st.columns([1, 1])
+# === ZONE 2: INSPECTION & UPLOAD (แบ่งซ้ายขวา) ===
+# col_visual (ซ้าย 70%) = เอารูปไว้ตรงนี้ให้ใหญ่ๆ
+# col_control (ขวา 30%) = เอาปุ่ม Upload ไว้ข้างๆ
+col_visual, col_control = st.columns([2, 1]) 
 
-with col_left:
-    st.subheader("Visual Inspection (ของจริงอาจใช้ภาพจาก CCTV)")
-    uploaded_file = st.file_uploader(f"Upload Image", type=["jpg", "png", "jpeg"])
+with col_control:
+    st.subheader("⚙️ Controls")
+    uploaded_file = st.file_uploader(f"Upload Image (CCTV)", type=["jpg", "png", "jpeg"])
     
+    run_btn = False
     if uploaded_file:
-        image = Image.open(uploaded_file)
-        st.image(image, caption=f"Inspection Point: {selected_line_name}", use_container_width=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.success("Image Loaded!")
+        st.markdown("Ready to analyze...")
+        # ปุ่มกดรัน ย้ายมาอยู่ตรงนี้ กดง่ายๆ
         run_btn = st.button("🚀 Run Expert Analysis", type="primary", use_container_width=True)
 
-with col_right:
-    st.subheader("คำแนะนำจาก AI")
+with col_visual:
+    st.subheader("👁️ Visual Inspection Monitor")
+    if uploaded_file:
+        image = Image.open(uploaded_file)
+        # แสดงรูปเต็มความกว้างคอลัมน์
+        st.image(image, caption=f"Live Feed: {selected_line_name}", use_container_width=True)
+    else:
+        # แสดงกรอบว่างๆ ให้รู้ว่ารอรูป
+        st.info("Waiting for image upload...")
+        st.markdown(
+            """
+            <div style="border: 2px dashed #ccc; padding: 50px; text-align: center; color: #ccc;">
+                NO SIGNAL INPUT
+            </div>
+            """, unsafe_allow_html=True
+        )
+
+# === ZONE 3: AI RESULT (ย้ายมาไว้ข้างล่าง เต็มจอ) ===
+if uploaded_file and run_btn:
+    st.divider()
+    st.subheader("🤖 AI Expert Analysis Result")
     
-    if uploaded_file and run_btn:
-        with st.spinner(f"Consulting {selected_line_name} Expert Module..."):
+    with st.spinner(f"Consulting {selected_line_name} Expert Module..."):
+        
+        result_text = ""
+        status = "PASS"
+        
+        # === LOGIC การทำงาน (เหมือนเดิม) ===
+        if use_simulation:
+            time.sleep(2.0) # ลดเวลาลงนิดนึงจะได้ทันใจ
             
-            result_text = ""
-            status = "PASS"
-            
-            # === LOGIC การทำงาน ===
-            if use_simulation:
-                # 🎭 SIMULATION MODE (โหมดการแสดงละคร)
-                time.sleep(2.5) # แกล้งรอ 2.5 วินาที ให้ดูสมจริง
+            if force_fail:
+                defects = current_config['Defect_Focus'].split(', ')
+                chosen_defect = defects[0] if defects else "Surface Crack"
+                result_text = f"""
+                ### 🚨 [STATUS]: FAIL
+                **Defect Detected:** {chosen_defect}
+                **Confidence Score:** 94.5%
                 
-                if force_fail:
-                    # ถ้าสั่งให้ Fail (จำลองการเจอของเสีย)
-                    defects = current_config['Defect_Focus'].split(', ')
-                    chosen_defect = defects[0] if defects else "Surface Crack"
-                    result_text = f"""
-                    [STATUS]: FAIL
-                    [DEFECT_DETECTED]: {chosen_defect}
-                    [CONFIDENCE_SCORE]: 94.5%
-                    [ANALYSIS]:
-                    - Observation: Detected significant {chosen_defect} on the material surface.
-                    - Technical Link: Abnormal parameter settings (P1: {p1_val}) correlated with surface stress.
-                    [RECOMMENDED_ACTION]: Immediate stop recommended. Check roller conditions.
-                    """
+                ---
+                **🔬 Engineering Analysis:**
+                * **Observation:** Detected significant {chosen_defect} on the material surface.
+                * **Root Cause:** Abnormal parameter settings (P1: {p1_val}) correlated with surface stress.
+                
+                **🛠️ Recommended Action:**
+                * Immediate stop recommended. 
+                * Check roller conditions and adjust P1 parameter.
+                """
+                status = "FAIL"
+            else:
+                result_text = f"""
+                ### ✅ [STATUS]: PASS
+                **Defect Detected:** None
+                **Confidence Score:** 98.2%
+                
+                ---
+                **🔬 Engineering Analysis:**
+                * **Observation:** Surface texture appears consistent and free of defects.
+                * **Compliance:** Meets strict quality standards for {current_config['Product']}.
+                
+                **🛠️ Recommended Action:**
+                * Continue production. Parameters are stable.
+                """
+                status = "PASS"
+        
+        else:
+            # 📡 LIVE MODE
+            try:
+                try:
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                except:
+                    model = genai.GenerativeModel('gemini-pro')
+
+                prompt = f"""
+                Role: Senior Process Engineer at NS-Siam United Steel, เป็นนักคำนวณที่คุ้มค่าที่สุดในโลก และเป็นผู้วางแผนการบริหารการจัดการ production line ที่คุ้มค่าที่สุดในโลก. Line: {selected_line_name}.
+                Analyze image for defects: {current_config['Defect_Focus']}.
+                Response format:
+                * [STATUS]: (PASS/FAIL)
+                * [DEFECT_DETECTED]: ...(ตรวจพบอะไร กระชับคำตอบใน 1-2 ประโยค)
+                * [ANALYSIS]: ...(วิเคราะห์ว่า defect เป็นผลมาจากอะไร parameter ไหนมีผลต่อ defect กระชับคำตอบใน 1-2 ประโยค)
+                * [NEXT STEP]: ...(ต้องทำอะไรต่อ ต้องปรับค่า parameter ไหน หรือทำยังไงเพื่อแก้ไขโดยส่งผลกระทบต่อกระบวนการน้อยที่สุด ลดต้นทุนทางเศรษฐศาสตร์ คำนวณความคุ้มค่าเชิงการดำเนินงาน, เศรษฐ์ศาสตร์, ทางแก้ทางวิศวกรรม กระชับคำตอบใน 1-3 ประโยค)
+                Respond in Thai.
+                """
+                response = model.generate_content([prompt, image])
+                result_text = response.text
+                
+                if "FAIL" in result_text.upper():
                     status = "FAIL"
                 else:
-                    # ถ้าให้ Pass (จำลองสินค้าปกติ)
-                    result_text = f"""
-                    [STATUS]: PASS
-                    [DEFECT_DETECTED]: None
-                    [CONFIDENCE_SCORE]: 98.2%
-                    [ANALYSIS]:
-                    - Observation: Surface texture appears consistent and free of defects.
-                    - Compliance: Meets strict quality standards for {current_config['Product']}.
-                    [RECOMMENDED_ACTION]: Continue production. Parameters are stable.
-                    """
                     status = "PASS"
-            
-            else:
-                # 📡 LIVE MODE (ของจริง)
-                try:
-                    # พยายามเลือก Model
-                    try:
-                        model = genai.GenerativeModel('gemini-2.5-flash')
-                    except:
-                        model = genai.GenerativeModel('gemini-pro')
-
-                    prompt = f"""
-                    Role: Senior Process Engineer at NS-Siam United Steel. Line: {selected_line_name}.
-                    Analyze image for defects: {current_config['Defect_Focus']}.
-                    Response: 
-                    * [STATUS]: (PASS/FAIL)
-                    * [DEFECT_DETECTED]: ...(อธิบายว่าเจออะไร), 
-                    * [ANALYSIS]: ...(วิเคราะห์ว่าปัญหาเกิดจากค่าพารามิเตอร์ไหน)
-                    * [NEXT STEP]: ...(ต้องแก้ปัญหาจากอะไร)
-                    ตอบเป็นภาษาไทย
-                    """
-                    response = model.generate_content([prompt, image])
-                    result_text = response.text
-                    # ----------------- แก้ไขตรงนี้ -----------------
-                    # เปลี่ยนการเช็กให้ครอบคลุม (เผื่อ AI ตอบ **FAIL** หรือมีเว้นวรรค)
-                    if "FAIL" in result_text.upper():
-                        status = "FAIL"
-                    else:
-                        status = "PASS"
-                    # -------------------------------------------------------------------
-                except Exception as e:
-                    st.error(f"⚠️ Live AI Failed (Quota Exceeded?): {e}")
-                    st.info("💡 Tip: เปิด 'Simulation Mode' ที่ Sidebar ด้านซ้ายเพื่อ Demo งานต่อได้เลย")
-                    status = "ERROR"
-
-            # === DISPLAY RESULT ===
-            if status != "ERROR":
-                if status == "FAIL":
-                    st.error(f"🚨 FAIL: Defect Detected")
-                else:
-                    st.success(f"✅ PASS: Quality Approved")
-                
-                with st.container(border=True):
-                    st.markdown(result_text)
                     
-                # Save Log
-                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                mode_label = "Simulated" if use_simulation else "AI Check"
-                save_log(current_time, selected_line_name, lot_number, p1_val, p2_val, p3_val, status, mode_label, "Low")
+            except Exception as e:
+                st.error(f"⚠️ Error: {e}")
+                status = "ERROR"
+
+        # === DISPLAY RESULT (แสดงผลแบบเต็มจอ) ===
+        if status != "ERROR":
+            # ใช้สีพื้นหลังแบ่งแยกชัดเจน
+            if status == "FAIL":
+                st.error("🚨 DEFECT DETECTED")
+                box_color = "#FFEBEB" # สีแดงอ่อน
+            else:
+                st.success("✅ QUALITY APPROVED")
+                box_color = "#E8FDF5" # สีเขียวอ่อน
+            
+            # สร้างกล่องผลลัพธ์สวยๆ
+            with st.container(border=True):
+                st.markdown(result_text)
+            
+            # Save Log
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            mode_label = "Simulated" if use_simulation else "AI Check"
+            save_log(current_time, selected_line_name, lot_number, p1_val, p2_val, p3_val, status, mode_label, "Low")
 
 st.divider()
 st.subheader("History Log")
