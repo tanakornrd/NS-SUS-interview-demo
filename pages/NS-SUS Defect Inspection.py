@@ -35,28 +35,29 @@ if use_simulation:
 else:
     st.sidebar.warning("📡 LIVE AI MODE: ระบบจะเรียกใช้ Google Gemini จริง (ระวัง Quota)")
 
-# --- 3. LOGIC & DATA ---
+# --- 3. LOGIC & DATA (Updated based on NSSUS.pdf) ---
 LINE_CONFIG = {
-    "CDCM (Cold Rolling Mill)": {
+    "CDCM (Continuous Descaling & Cold Rolling)": { 
+        # อ้างอิงจาก  รวมกระบวนการ Descaling และ Rolling ไว้ด้วยกัน
         "Product": "CR (Cold Rolled Steel)",
-        "Param1": {"name": "Rolling Force (MN)", "unit": "MN", "default": 1500, "min": 0, "max": 3000},
-        "Param2": {"name": "Strip Tension (kN)", "unit": "kN", "default": 50, "min": 0, "max": 200},
+        "Param1": {"name": "Pickling Acid Temp (°C)", "unit": "°C", "default": 85, "min": 60, "max": 100}, # เพิ่มส่วน Descaling 
+        "Param2": {"name": "Rolling Force (MN)", "unit": "MN", "default": 1500, "min": 0, "max": 3000},
         "Param3": {"name": "Rolling Speed (mpm)", "unit": "mpm", "default": 1200, "min": 0, "max": 2000},
-        "Defect_Focus": "Scale, Chatter marks, Edge cracks, Shape defects (Buckle)"
+        "Defect_Focus": "Residual Scale, Pickling stain, Chatter marks, Edge cracks" # เพิ่ม Defect จากการกัดกรด
     },
     "CGL (Continuous Galvanizing Line)": {
         "Product": "GA/GI (Galvanized Steel)",
-        "Param1": {"name": "Zinc Pot Temp (°C)", "unit": "°C", "default": 460, "min": 400, "max": 500},
-        "Param2": {"name": "Air Knife Pressure (kPa)", "unit": "kPa", "default": 40, "min": 0, "max": 100},
-        "Param3": {"name": "Line Speed (mpm)", "unit": "mpm", "default": 180, "min": 0, "max": 300},
-        "Defect_Focus": "Dross, Spangle defects, Uncoated spots, Zinc adhesion issues"
+        "Param1": {"name": "Annealing Furnace Temp (°C)", "unit": "°C", "default": 800, "min": 700, "max": 900}, # เพิ่มส่วน Annealing 
+        "Param2": {"name": "Zinc Pot Temp (°C)", "unit": "°C", "default": 460, "min": 440, "max": 480},
+        "Param3": {"name": "Air Knife Pressure (kPa)", "unit": "kPa", "default": 40, "min": 0, "max": 100}, # ควบคุม Coating Weight [cite: 80]
+        "Defect_Focus": "Dross, Uncoated spots, Zinc adhesion (Peeling), Fluting"
     },
     "EPL (Electrolytic Plating Line)": {
         "Product": "TP/TFS (Tinplate/Tin Free)",
-        "Param1": {"name": "Current Density (A/dm²)", "unit": "A/dm²", "default": 20, "min": 0, "max": 100},
-        "Param2": {"name": "Plating Solution Temp (°C)", "unit": "°C", "default": 50, "min": 20, "max": 80},
-        "Param3": {"name": "Line Speed (mpm)", "unit": "mpm", "default": 400, "min": 0, "max": 800},
-        "Defect_Focus": "Pinholes, Plating burns, Rust, Scratch (from Anode)"
+        "Param1": {"name": "Plating Current Density (A/dm²)", "unit": "A/dm²", "default": 20, "min": 0, "max": 100},
+        "Param2": {"name": "Reflow Temperature (°C)", "unit": "°C", "default": 250, "min": 230, "max": 300}, # เพิ่ม Reflow Process 
+        "Param3": {"name": "Coating Weight (g/m²)", "unit": "g/m²", "default": 2.8, "min": 1.0, "max": 11.0}, # สำคัญสำหรับ TP/TFS 
+        "Defect_Focus": "Pinholes, Plating burns (White/Black), Reflow stain, Woodgrain"
     }
 }
 
