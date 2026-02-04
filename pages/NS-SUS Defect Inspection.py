@@ -81,28 +81,33 @@ current_config = LINE_CONFIG[selected_line_name]
 
 st.info(f"📍 **Active Module:** `{current_config['Product']}`")
 
-# === ZONE 1: PARAMETERS (จัดให้ชิดขอบล่างเท่ากัน) ===
+# === ZONE 1: PARAMETERS (ปรับจูน UI ใหม่: แยกแถวชื่อกับแถวช่องกรอก) ===
 with st.container(border=True):
-    # ใช้ vertical_alignment="bottom" เพื่อให้ Input ทุกช่องวางระนาบเดียวกันเป๊ะ
-    c1, c2, c3, c4 = st.columns(4, vertical_alignment="bottom")
+    # -------------------------------------------------------------
+    # 📝 แถวที่ 1: ชื่อตัวแปร (Labels) -> บังคับติดขอบบนเสมอ
+    # -------------------------------------------------------------
+    l1, l2, l3, l4 = st.columns(4)
     
-    with c1:
-        st.markup("**Lot Number**")
-        lot_number = st.text_input("Lot No.", value="LOT-2026-X001", label_visibility="collapsed")
-    with c2:
-        p1_cfg = current_config['Param1']
-        st.markup(f"**{p1_cfg['name']}**")
-        p1_val = st.number_input("P1", value=p1_cfg['default'], label_visibility="collapsed")
-    with c3:
-        p2_cfg = current_config['Param2']
-        st.markup(f"**{p2_cfg['name']}**")
-        p2_val = st.number_input("P2", value=p2_cfg['default'], label_visibility="collapsed")
-    with c4:
-        p3_cfg = current_config['Param3']
-        st.markup(f"**{p3_cfg['name']}**")
-        p3_val = st.number_input("P3", value=p3_cfg['default'], label_visibility="collapsed")
+    # ใช้ style height เพื่อดันให้พื้นที่ข้อความเท่ากัน (เผื่อชื่อยาว 2 บรรทัด)
+    with l1: st.markdown(f"**Lot Number**")
+    with l2: st.markdown(f"**{current_config['Param1']['name']}**")
+    with l3: st.markdown(f"**{current_config['Param2']['name']}**")
+    with l4: st.markdown(f"**{current_config['Param3']['name']}**")
 
-st.markdown("---")
+    # -------------------------------------------------------------
+    # ⌨️ แถวที่ 2: ช่องกรอกข้อมูล (Inputs) -> บังคับเรียงกันข้างล่าง
+    # -------------------------------------------------------------
+    i1, i2, i3, i4 = st.columns(4)
+    
+    with i1: 
+        # label_visibility="collapsed" คือซ่อนชื่อในตัว Input (เพราะเราเขียนไว้ข้างบนแล้ว)
+        lot_number = st.text_input("Lot", value="LOT-2026-X001", label_visibility="collapsed")
+    with i2: 
+        p1_val = st.number_input("P1", value=current_config['Param1']['default'], label_visibility="collapsed")
+    with i3: 
+        p2_val = st.number_input("P2", value=current_config['Param2']['default'], label_visibility="collapsed")
+    with i4: 
+        p3_val = st.number_input("P3", value=current_config['Param3']['default'], label_visibility="collapsed")
 
 # === ZONE 2: INSPECTION & UPLOAD (แบ่งซ้ายขวา) ===
 # col_visual (ซ้าย 70%) = เอารูปไว้ตรงนี้ให้ใหญ่ๆ
