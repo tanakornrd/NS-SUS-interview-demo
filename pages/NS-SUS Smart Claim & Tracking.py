@@ -25,7 +25,6 @@ def init_db():
         if missing_cols:
             for col in missing_cols: df[col] = ""
         
-        # Auto-Fix: ถ้ามีงานค้างที่ System ให้โยนกลับเข้าแผนก
         if 'Current_Handler' in df.columns and 'Department' in df.columns:
             mask = (df['Current_Handler'] == "System") | (df['Current_Handler'].isnull())
             if mask.any():
@@ -53,15 +52,11 @@ def update_status(lot_id, new_status, action_note, next_handler=None, final_deci
     df = pd.read_csv(DB_FILE)
     idx = df[df['Lot_ID'].astype(str) == str(lot_id)].index
     if not idx.empty:
-        # === LOGIC: MASTER CONTROL (MCS Override) ===
         if force_handler:
-            # เปลี่ยนคนถือบอล (Handler)
             df.loc[idx, 'Current_Handler'] = force_handler
-            # เปลี่ยนแผนกเจ้าของเรื่อง (Department) ด้วย เพราะถือว่า AI ผิด
             df.loc[idx, 'Department'] = force_handler 
-            # เปลี่ยน Status
             new_status = f"Re-assigned to {force_handler}"
-            action_note += f" (⚠️ MCS Manual Override: Correcting Department)"
+            action_note += f" (⚠️ MCS Manual Override)"
 
         df.loc[idx, 'Status'] = new_status
         history = df.loc[idx, 'Action_History'].values[0]
@@ -80,29 +75,63 @@ def get_all_data():
     if not os.path.exists(DB_FILE): return pd.DataFrame()
     return pd.read_csv(DB_FILE)
 
+# === HELPER: สร้างรายงาน Text File ===
+def generate_customer_report(case_data):
+    report = f"""
+    =======================================================
+    OFFICIAL CLAIM RESOLUTION REPORT
+    NS-SUS SMART CLAIM TRACKING SYSTEM
+    =======================================================
+    Date: {datetime.now().strftime("%Y-%m-%d")}
+    Reference Lot ID: {case_data['Lot_ID']}
+    
+    -------------------------------------------------------
+    CASE INFORMATION
+    -------------------------------------------------------
+    Issue Reported: {case_data['Complaint']}
+    Date Reported: {case_data['Date']}
+    Responsible Department: {case_data['Department']}
+    
+    -------------------------------------------------------
+    INVESTIGATION & RESOLUTION
+    -------------------------------------------------------
+    Status: {case_data['Status']}
+    
+    FINAL DECISION: [{case_data['Final_Decision']}]
+    
+    NOTE TO CUSTOMER:
+    {case_data['Resolution_Note']}
+    
+    -------------------------------------------------------
+    ACTION HISTORY:
+    {str(case_data['Action_History']).replace(' || ', '\n    - ')}
+    
+    -------------------------------------------------------
+    Thank you for your trust in NS-SUS Quality Standards.
+    
+    Sincerely,
+    Marketing & Customer Service (MCS) Team
+    =======================================================
+    """
+    return report
+
 init_db()
 
 # ==========================================
-# 2. ส่วนสมอง AI (Force Update: QC, QA, MCS)
+# 2. ส่วนสมอง AI
 # ==========================================
 @st.cache_resource
 def load_model():
     try:
-        # เขียนไฟล์ Data ทับเสมอ เพื่อล้าง R&D เก่าออกให้หมด
         data = {
             'text': [
-                # === QC: สินค้า ===
                 'สนิมขึ้นที่ขอบเหล็ก', 'สินค้าบุบ', 'ขนาดความหนาไม่ได้ตามสเปค', 
                 'ผิวเหล็กเป็นรอยขีดข่วน', 'ความแข็งไม่ได้มาตรฐาน', 'สีเคลือบหลุดร่อน',
                 'มีคราบน้ำมันเยอะเกินไป', 'เหล็กยืดตัวไม่ได้', 'ขอบเหล็กคมเกินไป',
                 'ค่า Yield Strength ต่ำ', 'Defect ที่ผิว', 'รอยกดทับ', 'เหล็กแตก',
-                
-                # === QA: เอกสาร ===
                 'ใบ COA ไม่ตรงกับสินค้า', 'เอกสารรับรองคุณภาพผิด', 'หาใบเซอร์ไม่เจอ',
                 'ระบุเกรดเหล็กในใบส่งของผิด', 'ไม่ผ่านมาตรฐาน ISO', 'ตรวจสอบย้อนกลับไม่ได้',
                 'สเปคในระบบไม่ตรงกับป้าย', 'เอกสารประกอบการเคลมไม่ครบ', 'Label ผิด',
-                
-                # === MCS: บริการ ===
                 'ส่งของล่าช้ากว่ากำหนด', 'ติดต่อฝ่ายขายไม่ได้', 'พนักงานขับรถพูดจาไม่สุภาพ',
                 'ส่งสินค้าผิดสถานที่', 'แพ็คเกจจิ้งเสียหายจากการขนส่ง', 'ขอใบเสนอราคาช้า',
                 'ประสานงานยอดแย่', 'รถขนส่งมาไม่ตรงเวลา', 'แจ้งสถานะสินค้าผิด',
@@ -111,16 +140,13 @@ def load_model():
             'department': [
                 'QC', 'QC', 'QC', 'QC', 'QC', 'QC',
                 'QC', 'QC', 'QC', 'QC', 'QC', 'QC', 'QC',
-                
                 'QA', 'QA', 'QA', 'QA', 'QA', 'QA',
                 'QA', 'QA', 'QA',
-                
                 'MCS', 'MCS', 'MCS', 'MCS', 'MCS', 'MCS',
                 'MCS', 'MCS', 'MCS', 'MCS', 'MCS'
             ]
         }
         pd.DataFrame(data).to_csv('complaints_data.csv', index=False)
-            
         df = pd.read_csv('complaints_data.csv')
         model = make_pipeline(CountVectorizer(), MultinomialNB())
         model.fit(df['text'], df['department'])
@@ -141,20 +167,19 @@ with st.sidebar:
         if os.path.exists(DB_FILE):
             os.remove(DB_FILE)
             init_db()
-            st.success("Database Cleared!")
+            st.success("Database Cleared! 🧹")
             time.sleep(1)
             st.rerun()
 
 st.title("NS-SUS Smart Claim & Tracking")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow & Action Center", "Customer Tracking"])
+tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow (Master Control)", "Customer Tracking"])
 
 df = get_all_data()
 
 # --- TAB 1: EXECUTIVE DASHBOARD ---
 with tab1:
     st.markdown("### Real-time Analytics Dashboard")
-    st.caption("ข้อมูลวิเคราะห์สถานการณ์เคลมสินค้าแบบ Real-time")
     
     if not df.empty:
         col1, col2, col3, col4 = st.columns(4)
@@ -199,13 +224,10 @@ with tab2:
                         time.sleep(0.5)
                         predicted_dept = global_model.predict([complaint_input])[0]
                         status = f"Assigned to {predicted_dept}"
-                        
-                        # Logic กำหนดวันแบบใหม่ (QC, QA, MCS)
                         days = 3
-                        if predicted_dept == "QA": days = 5
-                        elif predicted_dept == "MCS": days = 5
+                        if predicted_dept == "QA": days = 1
+                        elif predicted_dept == "MCS": days = 2
                         elif predicted_dept == "QC": days = 5
-                        
                         save_to_db(lot_input, complaint_input, predicted_dept, status, days)
                     st.success(f"New case assigned to **{predicted_dept}**")
                     time.sleep(0.5)
@@ -237,7 +259,7 @@ with tab2:
 # --- TAB 3: Workflow (Master Control) ---
 with tab3:
     st.header("Workflow & Action Center")
-    user_roles = ["QC", "QA", "MCS"] # เหลือแค่ 3 แผนกตามสั่ง
+    user_roles = ["QC", "QA", "MCS"]
     user_dept = st.selectbox("Login As:", user_roles)
     
     subtab_active, subtab_history = st.tabs(["Pending Tasks", "Completed History"])
@@ -247,11 +269,9 @@ with tab3:
         active_tasks_all = df[df['Status'] != 'Case Closed']
         
         my_active_tasks = pd.DataFrame()
-        
-        # MCS เห็นงานทั้งหมด
         if user_dept == "MCS":
             my_active_tasks = active_tasks_all
-            st.success("MCS Mode Active: You can oversee and override wrong tasks.")
+            st.success("MCS Manual Control Override Mode Active")
         else:
             if 'Current_Handler' in df.columns:
                 my_active_tasks = active_tasks_all[active_tasks_all['Current_Handler'] == user_dept]
@@ -259,10 +279,8 @@ with tab3:
         with subtab_active:
             if not my_active_tasks.empty:
                 for index, row in my_active_tasks.iterrows():
-                    # ---------------------------------------------------------
-                    # 💡 ทริค: เติม _{index} ต่อท้าย key ทุกอัน เพื่อกัน ID ซ้ำแล้วแอปแตก
-                    # ---------------------------------------------------------
-                    unique_suffix = f"_{row['Lot_ID']}_{index}" 
+                    # ✅ FIXED: ใส่ Suffix เพื่อป้องกัน Duplicate Key
+                    unique_suffix = f"_{row['Lot_ID']}_{index}"
 
                     with st.container(border=True):
                         c1, c2 = st.columns([1.5, 1])
@@ -277,45 +295,38 @@ with tab3:
 
                         with c2:
                             st.write("### Action")
-                            
-                            # === MCS ZONE: MASTER CONTROL ===
                             if user_dept == "MCS":
                                 if row['Current_Handler'] == "MCS":
                                     st.markdown("##### Final Decision")
-                                    # แก้ key ตรงนี้
                                     decision = st.selectbox("Outcome", ["Approve", "Compromise", "Reject"], key=f"d{unique_suffix}")
                                     note = st.text_input("Note to Customer", key=f"n{unique_suffix}")
-                                    
                                     if st.button("Close Case", key=f"btn{unique_suffix}", type="primary"):
                                         update_status(row['Lot_ID'], "Case Closed", f"MCS: {decision}", "Completed", decision, note)
                                         st.rerun()
                                 
                                 st.markdown("---")
-                                st.markdown("##### MCS Manual Control Override")
-                                
+                                st.markdown("##### Manual Control Override")
                                 target_depts = ["QC", "QA", "MCS"]
                                 new_handler = st.selectbox("Re-assign to:", target_depts, key=f"move{unique_suffix}")
-                                
                                 if st.button("⚠️ Force Re-assign", key=f"btn_move{unique_suffix}"):
                                     update_status(row['Lot_ID'], f"Re-assigned to {new_handler}", "MCS Manual Control Override", force_handler=new_handler)
                                     st.success(f"Corrected assignment to {new_handler}")
                                     st.rerun()
 
-                            # === QC/QA ZONE ===
                             else: 
-                                # แก้ key ตรงนี้ด้วย
                                 note = st.text_input("Investigation Note", key=f"in{unique_suffix}")
                                 if st.button("➡️ Forward to MCS", key=f"fwd{unique_suffix}"):
                                     update_status(row['Lot_ID'], "Investigation Complete", f"{user_dept}: {note}", "MCS")
                                     st.rerun()
             else:
                 st.success(f"🎉 No pending tasks for **{user_dept}**")
+        
         with subtab_history:
             st.dataframe(completed_tasks, use_container_width=True)
 
-# --- TAB 4: Tracking ---
+# --- TAB 4: Customer Tracking ---
 with tab4:
-    st.subheader("🔍 Customer Status Check")
+    st.subheader("Customer Status Check")
     track_id = st.text_input("Enter Lot No.", placeholder="LOT-XXXX-XXX")
     if st.button("Search"):
         df_latest = get_all_data()
@@ -325,6 +336,7 @@ with tab4:
                 r = res.iloc[-1]
                 st.success("✅ Found Case")
                 st.progress(100 if r['Status'] == 'Case Closed' else 50)
+                
                 c1, c2 = st.columns(2)
                 with c1:
                     st.write(f"**Lot ID:** {r['Lot_ID']}")
@@ -332,8 +344,18 @@ with tab4:
                 with c2:
                     st.write(f"**Dept:** {r['Department']}")
                     st.write(f"**Handler:** {r['Current_Handler']}")
+                
                 if r['Status'] == 'Case Closed':
                     st.divider()
                     st.info(f"**Final Decision:** {r['Final_Decision']}\n\n**Note:** {r['Resolution_Note']}")
+                    
+                    # === ✨ FEATURE ใหม่: ปุ่มดาวน์โหลด Report ===
+                    report_content = generate_customer_report(r)
+                    st.download_button(
+                        label="📄 Download Official Resolution Report",
+                        data=report_content,
+                        file_name=f"Resolution_Report_{r['Lot_ID']}.txt",
+                        mime="text/plain"
+                    )
             else:
                 st.error("Not Found")
