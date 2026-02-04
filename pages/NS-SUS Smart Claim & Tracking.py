@@ -113,7 +113,7 @@ with st.sidebar:
             time.sleep(1)
             st.rerun()
 
-st.title("NSSUS Smart Claim Tracking")
+st.title("NS-SUS Smart Claim Tracking")
 
 # ปรับ Layout เป็น 4 Tabs
 tab1, tab2, tab3, tab4 = st.tabs(["Executive Dashboard", "Submit & Log", "Workflow", "Customer Tracking"])
@@ -122,8 +122,8 @@ df = get_all_data()
 
 # --- TAB 1: EXECUTIVE DASHBOARD (แทน Power BI) ---
 with tab1:
-    st.markdown("###Real-time Analytics Dashboard")
-    st.caption("ข้อมูลวิเคราะห์สถานการณ์เคลมสินค้าแบบ Real-time (ทดแทน Power BI)")
+    st.markdown("Real-time Analytics Dashboard")
+    st.caption("ข้อมูลวิเคราะห์สถานการณ์เคลมสินค้าแบบ Real-time")
     
     if not df.empty:
         # 1. KPI Cards (ตัวเลขสำคัญ)
