@@ -214,37 +214,51 @@ if uploaded_file and run_btn:
                     model = genai.GenerativeModel('gemini-pro')
 
                 prompt = f"""
-                Role: Senior Process Engineer at NS-Siam United Steel, เป็นนักคำนวณที่คุ้มค่าที่สุดในโลก และเป็นผู้วางแผนการบริหารการจัดการ production line ที่คุ้มค่าที่สุดในโลก. Line: {selected_line_name}.
-                Analyze image for defects: {current_config['Defect_Focus']}.
-                Response format: [STATUS]: ตอบแค่คำว่า "PASS" หรือ "FAIL"
-                * [DEFECT_DETECTED]: ...(ตรวจพบอะไร กระชับคำตอบใน 1-2 ประโยค)
-                * [ANALYSIS]: ...(วิเคราะห์ว่า defect เป็นผลมาจากอะไร parameter ไหนมีผลต่อ defect กระชับคำตอบใน 1-2 ประโยค)
-                * [NEXT STEP]: ...(ต้องทำอะไรต่อ ต้องปรับค่า parameter ไหน หรือทำยังไงเพื่อแก้ไขโดยส่งผลกระทบต่อกระบวนการน้อยที่สุด ลดต้นทุนทางเศรษฐศาสตร์ คำนวณความคุ้มค่าเชิงการดำเนินงาน, เศรษฐ์ศาสตร์, ทางแก้ทางวิศวกรรม กระชับคำตอบใน 1-3 ประโยค)
-                Respond in Thai.
+                Role: Senior Process Engineer at NS-Siam United Steel & Chief Financial Officer.
+                Your Goal: Balance Quality Assurance with Production Efficiency. Avoid false positives that cause unnecessary downtime (Economic Loss).
+                
+                Context: Inspecting {current_config['Product']} on {selected_line_name}.
+                Focus Defects: {current_config['Defect_Focus']}.
+                
+                Task: Analyze the image for CRITICAL defects only.
+                
+                Decision Logic:
+                1. STRICTLY differentiate between actual defects (cracks, rust, dents) vs. acceptable variations (lighting shadows, minor dust, water stains).
+                2. If the surface looks generally consistent or the anomaly is negligible, decide "PASS".
+                3. Only decide "FAIL" if the defect is clearly visible and affects the product's function.
+                
+                Response format:
+                [STATUS]: (PASS / FAIL) -> ตอบ FAIL เฉพาะเมื่อมั่นใจ 100% ว่าเป็นของเสียร้ายแรง
+                * [DEFECT_DETECTED]: (ระบุสิ่งที่เจอ หรือตอบ "None" ถ้าปกติ กระชับคำตอบใน 1-2 ประโยค)
+                * [CONFIDENCE]: (ระบุ % ความมั่นใจ)
+                * [ANALYSIS]: (วิเคราะห์สาเหตุทางวิศวกรรมสั้นๆ เชื่อมโยงกับ parameter: P1={p1_val}, P2={p2_val} ถ้าเกี่ยวข้อง, กระชับคำตอบใน 1-2 ประโยค)
+                * [NEXT STEP]: (เสนอทางแก้ที่ "คุ้มค่าที่สุด" เชิงเศรษฐศาสตร์ เช่น "ปรับ P1 เล็กน้อยแล้วรันต่อ" หรือ "ตัดส่วนเสียทิ้ง (Crop)" แทนการหยุดเครื่องจักรทันที, กระชับคำตอบใน 1-2 ประโยค)
+                
+                Respond in Thai. Professional & Concise tone.
                 """
+                
                 response = model.generate_content([prompt, image])
                 result_text = response.text
                 
+                # Logic การตัดเกรด (Check FAIL only if explicit)
                 if "FAIL" in result_text.upper():
                     status = "FAIL"
                 else:
                     status = "PASS"
                     
             except Exception as e:
-                st.error(f"⚠️ Error: {e}")
+                st.error(f"⚠️ Live AI Failed: {e}")
                 status = "ERROR"
 
         # === DISPLAY RESULT (แสดงผลแบบเต็มจอ) ===
         if status != "ERROR":
-            # ใช้สีพื้นหลังแบ่งแยกชัดเจน
             if status == "FAIL":
                 st.error("🚨 DEFECT DETECTED")
-                box_color = "#FFEBEB" # สีแดงอ่อน
+                box_color = "#FFEBEB"
             else:
                 st.success("✅ QUALITY APPROVED")
-                box_color = "#E8FDF5" # สีเขียวอ่อน
+                box_color = "#E8FDF5"
             
-            # สร้างกล่องผลลัพธ์สวยๆ
             with st.container(border=True):
                 st.markdown(result_text)
             
